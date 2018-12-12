@@ -15,4 +15,7 @@ trait InputConf[Event] extends Serializable {
   def defaultEventsGapMs: Long
 
   def dataTransformation: Option[SourceDataTransformation]
+
+  // Set maximum number of physically independent partitions for stream.keyBy operation
+  def maxPartitionsParallelism: Int = 8192
 }

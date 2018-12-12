@@ -15,7 +15,6 @@ import com.typesafe.config.ConfigFactory
 // import ru.itclover.tsp.BuildInfo
 import ru.itclover.tsp.http.services.flink.{MonitoringService, MonitoringServiceProtocols}
 import ru.itclover.tsp.http.services.flink.MonitoringServiceModel.MetricInfo
-import ru.itclover.tsp.transformers.FlinkCompilingPatternMapper
 import ru.itclover.tsp.utils.Exceptions
 import spray.json.PrettyPrinter
 import scala.util.{Failure, Success}
@@ -48,7 +47,7 @@ trait MonitoringRoutes extends RoutesProtocols with MonitoringServiceProtocols {
 
   val metricsInfo = List(
     MetricInfo(0, configs.getString("flink.metrics.source"), "numRecordsRead"),
-    MetricInfo(1, configs.getString("flink.metrics.search"), FlinkCompilingPatternMapper.currentEventTsMetric),
+    // MetricInfo(1, configs.getString("flink.metrics.search"), PatternMapper.currentEventTsMetric), // todo
     MetricInfo.onLastVertex(configs.getString("flink.metrics.sink"), "numRecordsProcessed")
   )
 
