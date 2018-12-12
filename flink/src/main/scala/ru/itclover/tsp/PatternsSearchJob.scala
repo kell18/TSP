@@ -69,13 +69,13 @@ case class PatternsSearchJob[In, InKey, InItem](
     forwardedFields: Seq[(Symbol, InKey)]
   ): DataStream[Incident] = {
     val mappers: Seq[StatefulFlatMapper[In, Any, Incident]] = patterns.map {
-      case ((pattern, _), rawP) =>
+      case ((pattern, meta), rawP) =>
         val allForwardFields = forwardedFields ++ rawP.forwardedFields.map(id => (id, source.fieldToEKey(id)))
         val toIncidents = ToIncidentsMapper(
           rawP.id,
           allForwardFields.map { case (id, k) => id.toString.tail -> k },
           rawP.payload.toSeq,
-          source.conf.defaultEventsGapMs,
+          if (meta.maxWindowMs > 0L) meta.maxWindowMs else source.conf.defaultEventsGapMs,
           source.conf.partitionFields.map(source.fieldToEKey)
         )
         PatternFlatMapper(

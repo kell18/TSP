@@ -47,7 +47,6 @@ object JobsRoutes {
         implicit val actorSystem = as
         implicit val materializer = am
         override val monitoringUri = monitoringUrl
-        streamEnv.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
       }.route
     }
 }
@@ -99,6 +98,7 @@ trait JobsRoutes extends RoutesProtocols {
     outConf: JDBCOutputConf,
     source: StreamSource[E, EKey, EItem]
   )(implicit decoders: BasicDecoders[EItem]) = {
+    streamEnv.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     val searcher = PatternsSearchJob(source, decoders)
     searcher.patternsSearchStream(
       patterns,
@@ -106,7 +106,7 @@ trait JobsRoutes extends RoutesProtocols {
       PatternsToRowMapper(inputConf.sourceId, outConf.rowSchema)
     ) map {
       case (parsedPatterns, stream) =>
-        val strPatterns = parsedPatterns.map(_._1._1.format(source.emptyEvent))
+        val strPatterns = parsedPatterns.map { case ((p, meta), _) => p.format(source.emptyEvent) + s" ;; Meta=$meta" }
         log.info(s"Parsed patterns:\n${strPatterns.mkString(";\n")}")
         stream
     }
