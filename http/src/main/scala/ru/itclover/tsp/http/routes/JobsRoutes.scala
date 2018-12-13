@@ -31,7 +31,7 @@ import ru.itclover.tsp.io.{AnyDecodersInstances, BasicDecoders}
 import ru.itclover.tsp.utils.UtilityTypes.ParseException
 import ru.itclover.tsp.io.EventCreatorInstances.rowEventCreator
 import ru.itclover.tsp.utils.ErrorsADT.{ConfigErr, Err, GenericRuntimeErr, RuntimeErr}
-import scala.util.Success
+import scala.util.Try
 
 object JobsRoutes {
 
@@ -69,6 +69,7 @@ trait JobsRoutes extends RoutesProtocols {
         import request._
 
         val resultOrErr = for {
+          result <- runStream(uuid, isAsync)
           source <- JdbcSource.create(inputConf)
           _      <- createStream(patterns, inputConf, outConf, source)
           result <- runStream(uuid, isAsync)
@@ -94,7 +95,7 @@ trait JobsRoutes extends RoutesProtocols {
 
   def createStream[E, EKey, EItem](
     patterns: Seq[RawPattern],
-    inputConf: InputConf[E],
+    inputConf: InputConf[E, EKey, EItem],
     outConf: JDBCOutputConf,
     source: StreamSource[E, EKey, EItem]
   )(implicit decoders: BasicDecoders[EItem]) = {
@@ -116,11 +117,11 @@ trait JobsRoutes extends RoutesProtocols {
     if (isAsync) { // Just detach job thread in case of async run
       Future { streamEnv.execute(uuid) } // TODO: possible deadlocks for big jobs amount! Custom thread pool or something
       Right(None)
-    } else { // Wait for the execution finish
+    } else {       // Wait for the execution finish
       Either.catchNonFatal(Some(streamEnv.execute(uuid))).leftMap(GenericRuntimeErr(_))
     }
 
-  def matchResultToResponse(result: Either[Err, Option[JobExecutionResult]], uuid: String): StandardRoute =
+  def matchResultToResponse(result: Either[Err, Option[JobExecutionResult]], uuid: String): Route =
     result match {
       case Left(err: ConfigErr)  => complete(BadRequest, FailureResponse(err))
       case Left(err: RuntimeErr) => complete(InternalServerError, FailureResponse(err))
@@ -130,7 +131,15 @@ trait JobsRoutes extends RoutesProtocols {
       case Right(Some(execResult)) => {
         // todo query read and written rows (onComplete(monitoring.queryJobInfo(request.uuid)))
         val execTime = execResult.getNetRuntime(TimeUnit.SECONDS)
-        complete(SuccessfulResponse(ExecInfo(execTime, Map.empty)))
+        onSuccess(monitoring.queryJobAllMetrics(uuid)) {
+          case Right(metrics) =>
+            log.warn(metrics.mkString(";"))
+            val extraMetrics: Map[String, Option[Long]] = metrics
+              .map(kv => kv._1 -> Try(kv._2.toLong).toOption)
+              .filter(kv => kv._1.contains("PatternStats"))
+            complete(SuccessfulResponse(ExecInfo(execTime, extraMetrics)))
+          case Left(err) => complete(InternalServerError, FailureResponse(err))
+        }
       }
     }
 

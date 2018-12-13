@@ -21,6 +21,7 @@ import cats.kernel.Semigroup
 import com.typesafe.scalalogging.Logger
 import org.apache.flink.types.Row
 import ru.itclover.tsp.io._
+import ru.itclover.tsp.phases.TimeMeasurementPhases.TimeMeasurementPattern
 import ru.itclover.tsp.utils.Exceptions.InvalidRequest
 import ru.itclover.tsp.utils.Bucketizer
 import ru.itclover.tsp.utils.Bucketizer.{Bucket, WeightExtractor}
@@ -112,6 +113,7 @@ object PatternsSearchJob {
           Validated
             .fromEither(PhaseBuilder.build[E, EKey, EItem](p.sourceCode, fieldsIdxMap.apply))
             .leftMap(err => List(s"PatternID#${p.id}, error: " + err))
+            .map(pat => (TimeMeasurementPattern(pat._1, p.id, p.sourceCode), pat._2))
       )
       .leftMap[ConfigErr](InvalidPatternsCode(_))
       .map(_.zip(rawPatterns))
@@ -144,7 +146,6 @@ object PatternsSearchJob {
       .name("Uniting adjacent incidents")
   }
 
-  // todo .. StrSink here?
   def saveStream[E](stream: DataStream[E], outputConf: OutputConf[E]) = {
     stream.writeUsingOutputFormat(outputConf.getOutputFormat)
   }

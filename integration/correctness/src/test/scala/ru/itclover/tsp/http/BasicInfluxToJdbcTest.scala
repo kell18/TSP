@@ -22,7 +22,7 @@ class BasicInfluxToJdbcTest
     with HttpService
     with ForAllTestContainer {
 
-  implicit override val executionContext: ExecutionContextExecutor = scala.concurrent.ExecutionContext.Implicits.global
+  implicit override val executionContext: ExecutionContextExecutor = scala.concurrent.ExecutionContext.global
   implicit override val streamEnvironment: StreamExecutionEnvironment =
     StreamExecutionEnvironment.createLocalEnvironment()
   streamEnvironment.setMaxParallelism(30000) // For proper keyBy partitioning
@@ -56,7 +56,7 @@ class BasicInfluxToJdbcTest
   )
   val typeCastingInputConf = inputConf.copy(query = """select *, speed as "speed(1)(2)" from SM_typeCasting_wide""")
   val fillingInputConf = inputConf.copy(query = """select * from SM_sparse_wide""",
-    dataTransformation = Some(WideDataFilling(Map('pos -> 2000, 'speed -> 2000), None)))
+    dataTransformation = Some(WideDataFilling(Map(0 -> 2000L, 1 -> 2000L), None)))
 
   val rowSchema = RowSchema('series_storage, 'from, 'to, ('app, 1), 'id, 'timestamp, 'context, inputConf.partitionFields)
 

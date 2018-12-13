@@ -19,10 +19,10 @@ import ru.itclover.tsp.utils.RowOps.{RowIdxExtractor, RowIsoTimeExtractor, RowTs
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-sealed trait StreamSource[Event, EKey, EItem] extends Product with Serializable {
+/*sealed*/ trait StreamSource[Event, EKey, EItem] extends Product with Serializable {
   def createStream: DataStream[Event]
 
-  def conf: InputConf[Event]
+  def conf: InputConf[Event, EKey, EItem]
 
   def emptyEvent: Event
 
