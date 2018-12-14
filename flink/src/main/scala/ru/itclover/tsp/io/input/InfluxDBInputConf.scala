@@ -41,6 +41,7 @@ case class InfluxDBInputConf(
   patternsParallelism: Option[Int] = Some(2)
 ) extends InputConf[Row, Int, Any] {
 
+  // .. TODO on params level with breaking changes (mb make extract DB specific conf into different section?)
   val influxConf = InfluxDBService.InfluxConf(url, dbName, userName, password, 200L)
 }
 

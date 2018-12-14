@@ -3,14 +3,6 @@ package ru.itclover.tsp.io.output
 import org.apache.flink.api.common.io.OutputFormat
 import org.apache.flink.types.Row
 
-trait OutputConf[Event] {
-  def forwardedFieldsIds: Seq[Symbol]
-
-  def getOutputFormat: OutputFormat[Event]
-
-  def parallelism: Option[Int]
-}
-
 /**
   * Sink for anything that support JDBC connection
   * @param rowSchema schema of writing rows, __will be replaced soon__
@@ -31,7 +23,6 @@ case class JDBCOutputConf(
   userName: Option[String] = None,
   parallelism: Option[Int] = Some(1)
 ) extends OutputConf[Row] {
-  override def getOutputFormat = JDBCOutput.getOutputFormat(this)
 
   override def forwardedFieldsIds = rowSchema.forwardedFields
 }
@@ -41,6 +32,5 @@ case class JDBCOutputConf(
   */
 case class EmptyOutputConf() extends OutputConf[Row] {
   override def forwardedFieldsIds: Seq[Symbol] = Seq()
-  override def getOutputFormat: OutputFormat[Row] = ???
   override def parallelism: Option[Int] = Some(1)
 }

@@ -6,32 +6,6 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo
 import ru.itclover.tsp.Segment
 import scala.collection.mutable
 
-
-/**
-  * Schema for writing data to sink.
-  */
-trait SinkSchema extends Serializable {
-  def rowSchema: RowSchema
-}
-
-
-case class KafkaSegmentsSink(schemaUri: String, brokerList: String, topicId: String, rowSchema: RowSchema) {
-  override def toString: String = {
-    "{" + super.toString + s", fieldsIndexesMap=${rowSchema.fieldsIndexesMap}"
-  }
-}
-
-
-trait EventSchema { // TODO fieldsTypesInfo to PatternsSearchJob
-  require(fieldsCount == fieldsTypes.length)
-
-  def fieldsTypes: List[Class[_]]
-
-  val fieldsNames: List[Symbol]
-
-  val fieldsCount: Int = fieldsNames.length
-}
-
 /**
   * Schema, used for result row construction for sinks. Params are names of fields in sink.
   * @param appIdFieldVal - special one, tuple of name and value (Clover Platform specific)
@@ -72,4 +46,11 @@ case class RowSchema(sourceIdField: Symbol, fromTsField: Symbol, toTsField: Symb
   def getTypeInfo = new RowTypeInfo(fieldClasses.map(TypeInformation.of(_)) :_*)
 
   def getJdbcTypes = ??? // TODO(r): make using SinkInfo with select limit 1
+}
+
+
+case class KafkaSegmentsSink(schemaUri: String, brokerList: String, topicId: String, rowSchema: RowSchema) {
+  override def toString: String = {
+    "{" + super.toString + s", fieldsIndexesMap=${rowSchema.fieldsIndexesMap}"
+  }
 }

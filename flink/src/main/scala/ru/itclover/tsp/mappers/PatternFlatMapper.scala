@@ -4,6 +4,7 @@ import ru.itclover.tsp.core.{Pattern, PatternResult, Time}
 import ru.itclover.tsp.core.PatternResult.{heartbeat, Failure, Success, TerminalResult}
 import ru.itclover.tsp.io.TimeExtractor
 import ru.itclover.tsp.{AbstractPatternMapper, ResultMapper}
+import ru.itclover.tsp.streaming.StatefulFlatMapper
 
 
 case class PatternFlatMapper[E, State, Inner, Out](

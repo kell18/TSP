@@ -1,19 +1,7 @@
 package ru.itclover.tsp.io.input
 
-import java.sql.{DriverManager, ResultSetMetaData}
-import java.util.Properties
 import scala.language.existentials
-import com.typesafe.config.ConfigFactory
-import org.apache.flink.api.common.io.{GenericInputFormat, RichInputFormat}
-import org.apache.flink.api.common.typeinfo.TypeInformation
-import org.apache.flink.api.java.io.jdbc.JDBCInputFormat
-import org.apache.flink.api.java.typeutils.RowTypeInfo
-import org.apache.flink.core.io.InputSplit
 import org.apache.flink.types.Row
-import cats.syntax.either._
-import ru.itclover.tsp.utils.UtilityTypes.ThrowableOr
-import ru.itclover.tsp.StreamSource
-import scala.util.Try
 
 /**
   * Source for anything that support JDBC connection

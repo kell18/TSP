@@ -10,9 +10,9 @@ import ru.itclover.tsp.io.output.RowSchema
 /**
   * Packer of found incident into [[org.apache.flink.types.Row]]
   */
-case class PatternsToRowMapper[Event, EKey](sourceId: Int, schema: RowSchema) extends RichMapFunction[Incident, Row] {
+case class PatternsToRowMapper[Event, EKey](sourceId: Int, schema: RowSchema) {
 
-  override def map(incident: Incident) = {
+  def apply(incident: Incident) = {
     val resultRow = new Row(schema.fieldsCount)
     resultRow.setField(schema.sourceIdInd, sourceId)
     resultRow.setField(schema.patternIdInd, incident.patternId)

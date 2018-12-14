@@ -1,17 +1,29 @@
 package ru.itclover.tsp.io
 
-import ru.itclover.tsp.core.Time
+import ru.itclover.tsp.core.{Incident, Time}
 
 trait Extractor[Event, EKey, EItem] extends Serializable {
   // TODO Kind projector here
   def apply[T](e: Event, k: EKey)(implicit d: Decoder[EItem, T]): T
 }
 
+
 trait KVExtractor[Event, EKey, EItem] extends Serializable {
   // .. TODO Kind projector here
   def apply[T](e: Event, k: EKey): (EKey, EItem)
 }
 
+
 trait TimeExtractor[Event] extends Serializable {
   def apply(e: Event): Time
+}
+
+object TimeExtractorInstances {
+  implicit val incidentTI_from = new TimeExtractor[Incident] {
+    override def apply(e: Incident) = e.segment.from
+  }
+
+  implicit val incidentTI_to = new TimeExtractor[Incident] {
+    override def apply(e: Incident) = e.segment.to
+  }
 }

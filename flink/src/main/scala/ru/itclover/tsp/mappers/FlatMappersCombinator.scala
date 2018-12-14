@@ -4,25 +4,8 @@ import org.apache.flink.api.common.functions.{AbstractRichFunction, RichFlatMapF
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor, MapState, MapStateDescriptor}
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.util.Collector
+import ru.itclover.tsp.streaming.StatefulFlatMapper
 import scala.reflect.ClassTag
-
-
-trait StatefulFlatMapper[In, State, Out] extends ((In, State) => (Seq[Out], State)) { self =>
-  def initialState: State
-
-  def andThen[OtherS, NewOut](other: StatefulFlatMapper[Out, OtherS, NewOut]) =
-    new StatefulFlatMapper[In, (State, OtherS), NewOut] {
-      override def initialState = (self.initialState, other.initialState)
-
-      override def apply(in: In, states: (State, OtherS)) = {
-        val (s1, s2) = states
-        val (r1, newS) = self.apply(in, s1)
-        // val (r2, newOtherS) = other.apply(r1, s2) // todo after vectorization
-        // r2 -> (newS, newOtherS)
-        ???
-      }
-    }
-}
 
 
 class FlatMappersCombinator[In, S: ClassTag, Out](mappers: Seq[StatefulFlatMapper[In, S, Out]])

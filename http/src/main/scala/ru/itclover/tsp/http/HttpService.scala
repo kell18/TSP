@@ -40,7 +40,7 @@ trait HttpService extends RoutesProtocols {
   private val log = Logger[HttpService]
 
   def composeRoutes: Reader[ExecutionContextExecutor, Route] = for {
-    jobs       <- JobsRoutes.fromExecutionContext(monitoringUri)
+    jobs       <- FlinkJobsRoutes.fromExecutionContext(monitoringUri)
     monitoring <- MonitoringRoutes.fromExecutionContext(monitoringUri)
     // validation <- ValidationRoutes.fromExecutionContext(monitoringUri)
   } yield jobs ~ monitoring // ~ validation

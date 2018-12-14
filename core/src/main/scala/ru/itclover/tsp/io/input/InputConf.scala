@@ -1,6 +1,5 @@
 package ru.itclover.tsp.io.input
 
-
 trait InputConf[Event, EKey, EItem] extends Serializable {
   def sourceId: Int // todo .. Rm
 
@@ -17,5 +16,5 @@ trait InputConf[Event, EKey, EItem] extends Serializable {
   def dataTransformation: Option[SourceDataTransformation[Event, EKey, EItem]]
 
   // Set maximum number of physically independent partitions for stream.keyBy operation
-  def maxPartitionsParallelism: Int = 8192
+  def maxPartitions: Int = 8192
 }
