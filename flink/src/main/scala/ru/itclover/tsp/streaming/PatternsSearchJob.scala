@@ -6,7 +6,7 @@ import cats.implicits._
 import com.typesafe.scalalogging.Logger
 import ru.itclover.tsp.core.{Incident, IncidentId, Pattern, RawPattern}
 import ru.itclover.tsp.core.IncidentInstances.semigroup
-import ru.itclover.tsp.dsl.{PatternMetadata, PhaseBuilder}
+import ru.itclover.tsp.dsl.{PatternBuilder, PatternMetadata}
 import ru.itclover.tsp.io._
 import ru.itclover.tsp.io.TimeExtractorInstances.incidentTI_from
 import ru.itclover.tsp.mappers._
@@ -35,13 +35,14 @@ case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], Type
     rawPatterns: Seq[RawPattern],
     sink: Sink[OutE],
     resultMapper: Incident => OutE
-  ): Either[ConfigErr, (Seq[RichPattern[In]], Vector[S[OutE]])] =
-    preparePatterns[In, InKey, InItem](rawPatterns, source.fieldToEKey) map { patterns =>
+  ): Either[ConfigErr, (Seq[RichPattern[In]], Vector[S[OutE]])] = {
+    preparePatterns[In, InKey, InItem](rawPatterns, source.fieldToEKey, source.conf.defaultToleranceFraction.getOrElse(0)) map { patterns =>
       val forwardFields = sink.conf.forwardedFieldsIds.map(id => (id, source.fieldToEKey(id)))
       val incidents = cleanIncidentsFromPatterns(patterns, forwardFields)
       val mapped = incidents.map(x => streamAlg.map(x)(resultMapper))
       (patterns, mapped.map(m => streamAlg.addSink(m)(sink)))
     }
+  }
 
   def cleanIncidentsFromPatterns(
     richPatterns: Seq[RichPattern[In]],
@@ -83,8 +84,7 @@ case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], Type
           pattern,
           toIncidents.apply,
           source.conf.eventsMaxGapMs,
-          source.emptyEvent,
-          source.isEventTerminal
+          source.emptyEvent
         )(timeExtractor).asInstanceOf[StatefulFlatMapper[In, Any, Incident]]
     }
     val keyed = streamAlg.keyBy(stream)(source.partitioner, maxPartitions)
@@ -100,7 +100,8 @@ object PatternsSearchJob {
 
   def preparePatterns[E: TimeExtractor, EKey, EItem](
     rawPatterns: Seq[RawPattern],
-    fieldsIdxMap: Symbol => EKey
+    fieldsIdxMap: Symbol => EKey,
+    toleranceFraction: Double
   )(
     implicit extractor: Extractor[E, EKey, EItem],
     dDecoder: Decoder[EItem, Double]
@@ -109,7 +110,7 @@ object PatternsSearchJob {
       .traverse(rawPatterns.toList)(
         p =>
           Validated
-            .fromEither(PhaseBuilder.build[E, EKey, EItem](p.sourceCode, fieldsIdxMap.apply))
+            .fromEither(PatternBuilder.build[E, EKey, EItem](p.sourceCode, fieldsIdxMap.apply, toleranceFraction))
             .leftMap(err => List(s"PatternID#${p.id}, error: " + err))
             .map(pat => (TimeMeasurementPattern(pat._1, p.id, p.sourceCode), pat._2))
       )
