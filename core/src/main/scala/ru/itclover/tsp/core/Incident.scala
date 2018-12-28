@@ -12,14 +12,15 @@ import ru.itclover.tsp.Segment
   * @param forwardedFields which fields need to push to sink
   */
 case class Incident(
-  id: String,
+  id: IncidentId,
   patternId: String,
-  maxWindowMs: Long,
   segment: Segment,
   forwardedFields: Seq[(String, Any)],
   patternPayload: Seq[(String, Any)]
 ) extends Product
     with Serializable
+
+case class IncidentId(patternId: String, partitionsKeyValues: String)
 
 
 object IncidentInstances {
@@ -35,7 +36,6 @@ object IncidentInstances {
       Incident(
         b.id,
         b.patternId,
-        b.maxWindowMs,
         Segment(from, to),
         b.forwardedFields,
         b.patternPayload

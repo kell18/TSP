@@ -1,12 +1,16 @@
 
 /*** Settings ***/
 
+
+// Kind projector
+resolvers += Resolver.sonatypeRepo("releases")
+
 name := "TSP"
 organization in ThisBuild := "ru.itclover" // Fallback-settings for all sub-projects (ThisBuild task)
 maintainer in Docker := "Clover Group"
 dockerUsername in Docker := Some("clovergrp")
 
-scalaVersion in ThisBuild := "2.12.7"
+scalaVersion in ThisBuild := "2.12.8"
 resolvers in ThisBuild ++= Seq("Apache Development Snapshot Repository" at
     "https://repository.apache.org/content/repositories/snapshots/", Resolver.mavenLocal)
 javaOptions in ThisBuild += "--add-modules=java.xml.bind"
@@ -18,15 +22,16 @@ lazy val commonSettings = Seq(
   scalacOptions ++= Seq(
     "-Ypartial-unification", // allow the compiler to unify type constructors of different arities
     "-deprecation",          // warn about use of deprecated APIs
-    "-feature"               // warn about feature warnings 
+    "-feature"               // warn about feature warnings
   ),
   ghreleaseNotes := Utils.releaseNotes,
   ghreleaseRepoOrg := "Clover-Group",
   ghreleaseRepoName := "tsp",
-  
+
   // don't release subprojects
   githubRelease := null,
-  skip in publish := true
+  skip in publish := true,
+  addCompilerPlugin("org.spire-math" %% "kind-projector" % Version.kindProjector)
 )
 
 lazy val assemblySettings = Seq(
@@ -125,13 +130,21 @@ lazy val flinkConnector = project.in(file("flink"))
   )
   .dependsOn(core, config, dsl)
 
+lazy val fs2Connector = project.in(file("fs2-connector"))
+  .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Library.fs2 ++ Library.scalaTest ++ Library.dbDrivers
+      ++ Library.kafka ++ Library.jackson
+  )
+  .dependsOn(core, config, dsl)
+
 lazy val http = project.in(file("http"))
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Library.scalaTest ++ Library.flink ++ Library.akka ++
       Library.akkaHttp ++ Library.twitterUtil
   )
-  .dependsOn(core, config, flinkConnector, dsl)
+  .dependsOn(core, config, flinkConnector, fs2Connector, dsl)
 
 lazy val spark = project.in(file("spark"))
   .settings(commonSettings)
@@ -165,11 +178,6 @@ lazy val integrationPerformance = project.in(file("integration/performance"))
 
 
 /*** Other settings ***/
-
-// Kind projector 
-resolvers += Resolver.sonatypeRepo("releases")
-addCompilerPlugin("org.spire-math" %% "kind-projector" % Version.kindProjector)
-
 
 
 // Git-specific settings

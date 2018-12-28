@@ -22,7 +22,7 @@ import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.api.TimeCharacteristic
-import ru.itclover.tsp.core.{Incident, Pattern, RawPattern}
+import ru.itclover.tsp.core.{Incident, IncidentId, Pattern, RawPattern}
 import ru.itclover.tsp.http.domain.output.SuccessfulResponse.ExecInfo
 import ru.itclover.tsp.http.services.flink.MonitoringService
 import ru.itclover.tsp.io.{AnyDecodersInstances, BasicDecoders}
@@ -99,6 +99,7 @@ trait FlinkJobsRoutes extends RoutesProtocols {
     streamEnv.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     val searcher = PatternsSearchJob(FlinkStreamAlg(), source, decoders)(
       TypeInformation.of(classOf[Incident]),
+      TypeInformation.of(classOf[IncidentId]),
       TypeInformation.of(classOf[String])
     )
     searcher.patternsSearchStream(

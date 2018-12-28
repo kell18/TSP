@@ -5,12 +5,10 @@ import cats.Semigroup
 import ru.itclover.tsp.io.TimeExtractor
 import scala.language.higherKinds
 
-// .. type factory
 trait Stream {
   type S[_]
   type KeyedS[_, _] <: S[_]
   type TypeInfo[_]
-  type Typ
 }
 
 trait StreamAlg[S[_], KeyedS[_, _] <: S[_], TypeInfo[_]] {
@@ -25,7 +23,7 @@ trait StreamAlg[S[_], KeyedS[_, _] <: S[_], TypeInfo[_]] {
     mappers: Seq[StatefulFlatMapper[In, State, Out]]
   ): S[Out]
 
-  def reduceNearby[In: Semigroup: TimeExtractor, K](stream: KeyedS[In, K])(getSessionSize: In => Long): S[In]
+  def reduceNearby[In: Semigroup: TimeExtractor, K](stream: KeyedS[In, K])(getSessionSizeMs: K => Long): S[In]
 
   def addSink[T](stream: S[T])(sink: Sink[T]): S[T]
 }

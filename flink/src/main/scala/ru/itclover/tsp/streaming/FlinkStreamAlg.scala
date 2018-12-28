@@ -1,10 +1,12 @@
 package ru.itclover.tsp.streaming
 
 import cats.Semigroup
-import cats.syntax.semigroup._
+import cats.syntax.all._
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.streaming.api.scala.{DataStream, KeyedStream}
 import org.apache.flink.streaming.api.windowing.assigners.{EventTimeSessionWindows, SessionWindowTimeGapExtractor}
+import org.apache.flink.util.Collector
 import ru.itclover.tsp.io.TimeExtractor
 import ru.itclover.tsp.mappers.FlatMappersCombinator
 import ru.itclover.tsp.core.IncidentInstances.semigroup
@@ -21,7 +23,7 @@ case class FlinkStreamAlg() extends StreamAlg[DataStream, KeyedStream, TypeInfor
 
   override def keyBy[In, K: TypeInformation](stream: DataStream[In])(partitioner: In => K, maxPartitions: Int): KeyedStream[In, K] =
     stream
-      .setMaxParallelism(maxPartitions) // .. check is correct
+      .setMaxParallelism(maxPartitions) // .. todo(1) check is correct (ConcModEx)
       .keyBy(partitioner)
 
   override def flatMapWithState[In, State: ClassTag, Out: TypeInformation, K](stream: KeyedStream[In, K])(
@@ -33,14 +35,19 @@ case class FlinkStreamAlg() extends StreamAlg[DataStream, KeyedStream, TypeInfor
     stream.map(f)
 
   override def reduceNearby[In: Semigroup: TimeExtractor, K](stream: KeyedStream[In, K])(
-    getSessionSize: In => Long
-  ): DataStream[In] =
+    getSessionSizeMs: K => Long
+  ): DataStream[In] = {
+    val selector = stream.javaStream
+      .asInstanceOf[org.apache.flink.streaming.api.datastream.KeyedStream[In, K]]
+      .getKeySelector
     stream
-      .window(EventTimeSessionWindows.withDynamicGap(new SessionWindowTimeGapExtractor[In] {
-        override def extract(element: In): Long = getSessionSize(element)
-      }))
-      .reduce { _ |+| _ }
+      .window(EventTimeSessionWindows.withDynamicGap { el: In =>
+        val key = selector.getKey(el)
+        getSessionSizeMs(key)
+      })
+      .reduce { (a: In, b: In) => a |+| b }
       .name("Uniting adjacent items")
+  }
 
   //noinspection ConvertibleToMethodValue
   override def addSink[T](stream: DataStream[T])(sink: Sink[T]): DataStream[T] = {

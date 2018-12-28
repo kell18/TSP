@@ -3,13 +3,11 @@ package ru.itclover.tsp.io
 import ru.itclover.tsp.core.{Incident, Time}
 
 trait Extractor[Event, EKey, EItem] extends Serializable {
-  // TODO Kind projector here
-  def apply[T](e: Event, k: EKey)(implicit d: Decoder[EItem, T]): T
+  def apply[T](e: Event, k: EKey)(implicit T: Decoder[EItem, T]): T
 }
 
 
 trait KVExtractor[Event, EKey, EItem] extends Serializable {
-  // .. TODO Kind projector here
   def apply[T](e: Event, k: EKey): (EKey, EItem)
 }
 

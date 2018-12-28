@@ -2,12 +2,11 @@ package ru.itclover.tsp.services
 
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
-import collection.JavaConversions._
+import collection.JavaConverters._
 import okhttp3.OkHttpClient
 import org.apache.flink.api.common.typeinfo.TypeInformation
-import cats.syntax.either._
 import org.influxdb.{InfluxDB, InfluxDBException, InfluxDBFactory}
-import org.influxdb.dto.Query
+import org.influxdb.dto.{Query, QueryResult}
 import scala.util.{Failure, Success, Try}
 import ru.itclover.tsp.utils.CollectionsOps.StringOps
 import ru.itclover.tsp.utils.CollectionsOps.{OptionOps, TryOps}
@@ -25,15 +24,15 @@ object InfluxDBService {
   def fetchFieldsTypesInfo(query: String, conf: InfluxConf): Try[Seq[(Symbol, Class[_])]] = for {
     db <- connectDb(conf)
     series <- fetchFirstSeries(db, query, conf.dbName)
-    values <- series.getValues.headOption.toTry(whenNone = emptyValuesException(query))
-    tags = if (series.getTags != null) series.getTags.toSeq.sortBy(_._1) else Seq.empty
+    values <- series.getValues.asScala.headOption.map(_.asScala).toTry(whenNone = emptyValuesException(query))
+    tags = if (series.getTags != null) series.getTags.asScala.toSeq.sortBy(_._1) else Seq.empty
   } yield {
-    val fields = tags.map(_._1) ++ series.getColumns.toSeq
+    val fields = tags.map(_._1) ++ series.getColumns.asScala
     val classes = tags.map(_ => classOf[String]) ++ values.map(v => if (v != null) v.getClass else classOf[Double])
     fields.map(Symbol(_)).zip(classes)
   }
 
-  def fetchFirstSeries(db: InfluxDB, query: String, dbName: String) = {
+  def fetchFirstSeries(db: InfluxDB, query: String, dbName: String): Try[QueryResult.Series] = {
     val influxQuery = new Query(makeLimit1Query(query), dbName)
     for {
       result <- Try(db.query(influxQuery))
@@ -41,13 +40,13 @@ object InfluxDBService {
       else if (result.getResults == null) Failure(new InfluxDBException(s"Null results of query `$influxQuery`."))
       else Success(())
       // Safely get first series
-      firstSeries <- result.getResults.headOption
-        .flatMap(r => Option(r.getSeries).flatMap(_.headOption))
+      firstSeries <- result.getResults.asScala.headOption
+        .flatMap(r => Option(r.getSeries.asScala).flatMap(_.headOption))
         .toTry(whenNone = new InfluxDBException(s"Empty results in query - `$query`."))
     } yield firstSeries
   }
 
-  def connectDb(conf: InfluxConf) = {
+  def connectDb(conf: InfluxConf): Try[InfluxDB] = {
     import conf._
     val extraConf = new OkHttpClient.Builder()
       .readTimeout(timeoutSec, TimeUnit.SECONDS)

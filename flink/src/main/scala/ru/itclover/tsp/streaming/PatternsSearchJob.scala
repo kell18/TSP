@@ -4,9 +4,7 @@ import cats.data.Validated
 import cats.Traverse
 import cats.implicits._
 import com.typesafe.scalalogging.Logger
-import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.api.windowing.assigners.{EventTimeSessionWindows, SessionWindowTimeGapExtractor}
-import ru.itclover.tsp.core.{Incident, Pattern, RawPattern}
+import ru.itclover.tsp.core.{Incident, IncidentId, Pattern, RawPattern}
 import ru.itclover.tsp.core.IncidentInstances.semigroup
 import ru.itclover.tsp.dsl.{PatternMetadata, PhaseBuilder}
 import ru.itclover.tsp.io._
@@ -20,11 +18,12 @@ import ru.itclover.tsp.utils.ErrorsADT.{ConfigErr, InvalidPatternsCode}
 import ru.itclover.tsp.Segment
 import scala.language.higherKinds
 
+// .. type factory
 case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], TypeInfo[_]](
   streamAlg: StreamAlg[S, KeyedS, TypeInfo],
   source: Source[In, InKey, InItem, S],
   decoders: BasicDecoders[InItem]
-)(implicit incidentTI: TypeInfo[Incident], strTI: TypeInfo[String]) {
+)(implicit incidentTI: TypeInfo[Incident], incidentIdTI: TypeInfo[IncidentId], strTI: TypeInfo[String]) {
 
   import decoders._
   import source.{extractor, timeExtractor}
@@ -44,7 +43,6 @@ case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], Type
       (patterns, mapped.map(m => streamAlg.addSink(m)(sink)))
     }
 
-
   def cleanIncidentsFromPatterns(
     richPatterns: Seq[RichPattern[In]],
     forwardedFields: Seq[(Symbol, InKey)]
@@ -55,11 +53,15 @@ case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], Type
       patternsBucket <- bucketizePatterns(sourceBucket.items, source.conf.patternsParallelism.getOrElse(1))
     } yield {
       val singleIncidents = incidentsFromPatterns(stream, patternsBucket.items, forwardedFields)
+
       if (source.conf.defaultEventsGapMs > 0L) {
-        val keyed = streamAlg.keyBy(singleIncidents)(_.id, maxPartitions)
-        streamAlg.reduceNearby(keyed)(_.maxWindowMs)
-      }
-      else
+        val keyedIncidents = streamAlg.keyBy(singleIncidents)(_.id, maxPartitions)
+        val patternsToWindows = richPatterns.map { case ((_, meta), raw) => raw.id -> meta.maxWindowMs }.toMap
+        streamAlg.reduceNearby(keyedIncidents)(inc =>
+          // Get max window of pattern, or, if it is = 0 - defaultEventsGapMs from conf
+          patternsToWindows.get(inc.patternId).filter(_ > 0L).getOrElse(source.conf.defaultEventsGapMs)
+        )
+      } else
         singleIncidents
     }
 
@@ -75,7 +77,6 @@ case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], Type
           rawP.id,
           allForwardFields.map { case (id, k) => id.toString.tail -> k },
           rawP.payload.toSeq,
-          if (meta.maxWindowMs > 0L) meta.maxWindowMs else source.conf.defaultEventsGapMs,
           source.conf.partitionFields.map(source.fieldToEKey)
         )
         PatternFlatMapper(
@@ -121,7 +122,7 @@ object PatternsSearchJob {
     val patternsBuckets = if (parallelism > patterns.length) {
       log.warn(
         s"Patterns parallelism conf ($parallelism) is higher than amount of " +
-          s"phases - ${patterns.length}, setting patternsParallelism to amount of phases."
+        s"phases - ${patterns.length}, setting patternsParallelism to amount of phases."
       )
       Bucketizer.bucketizeByWeight(patterns, patterns.length)
     } else {
@@ -129,16 +130,5 @@ object PatternsSearchJob {
     }
     log.info("Patterns Buckets:\n" + Bucketizer.bucketsToString(patternsBuckets))
     patternsBuckets
-  }
-
-  def reduceIncidents(incidents: DataStream[Incident]) = {
-    incidents
-      .assignAscendingTimestamps(p => p.segment.from.toMillis)
-      .keyBy(_.id)
-      .window(EventTimeSessionWindows.withDynamicGap(new SessionWindowTimeGapExtractor[Incident] {
-        override def extract(element: Incident): Long = element.maxWindowMs
-      }))
-      .reduce { _ |+| _ }
-      .name("Uniting adjacent incidents")
   }
 }

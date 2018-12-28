@@ -5,15 +5,21 @@ import scala.collection.{mutable => m}
 import scala.language.higherKinds
 import fs2.concurrent.Queue
 import cats.implicits._
-import cats.effect.Concurrent
+import cats.effect.{Concurrent, Effect}
 import cats.{Applicative, CommutativeApplicative, Traverse}
 import cats.effect.concurrent.Ref
+import cats.kernel.Semigroup
 import com.typesafe.scalalogging.Logger
-import fs2.{Pipe, Stream}
+import fs2.{Chunk, Pipe, Stream}
+import scala.concurrent.ExecutionContext
 
 object Fs2Ops {
 
   val log = Logger("Fs2Ops")
+
+  def reduceLeft[S: Semigroup](c: Chunk[S]): Option[S] = c.head.map{ h =>
+    c.foldLeft(h) { case (acc, el) => acc |+| el }
+  }
 
   /**
     * Split input Stream to Stream of (Key, PartitionStream), where each PartitionStream contains elements only
