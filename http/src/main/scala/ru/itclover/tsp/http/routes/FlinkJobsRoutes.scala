@@ -28,6 +28,7 @@ import ru.itclover.tsp.http.services.flink.MonitoringService
 import ru.itclover.tsp.io.{AnyDecodersInstances, BasicDecoders}
 import ru.itclover.tsp.utils.ErrorsADT.{ConfigErr, Err, GenericRuntimeErr, RuntimeErr}
 import ru.itclover.tsp.streaming._
+import scala.util.Try
 
 object FlinkJobsRoutes {
 
@@ -118,7 +119,7 @@ trait FlinkJobsRoutes extends RoutesProtocols {
     if (isAsync) { // Just detach job thread in case of async run
       Future { streamEnv.execute(uuid) } // TODO: possible deadlocks for big jobs amount! Custom thread pool or something
       Right(None)
-    } else {       // Wait for the execution finish
+    } else { // Wait for the execution finish
       Either.catchNonFatal(Some(streamEnv.execute(uuid))).leftMap(GenericRuntimeErr(_))
     }
 

@@ -1,5 +1,4 @@
 package ru.itclover.tsp.utils
-
 import ru.itclover.tsp.streaming.PatternsSearchJob.RichPattern
 
 object Bucketizer {
@@ -12,7 +11,7 @@ object Bucketizer {
     val bigToSmallItems = items.sortBy(implicitly[WeightExtractor[T]].apply(_)).reverse
     bigToSmallItems.foldLeft(initBuckets) {
       case (buckets, item) => {
-        // TODO OPTIMIZE try to use min-heap here to retrieve min bucket; mutable vector to not copy elements each time
+        // TODO OPTIMIZE try to use min-heap here to retrieve min bucket
         val minBucketInd = buckets.zipWithIndex.minBy(_._1.totalWeight)._2
         val minBucket = buckets(minBucketInd)
         val windSize = implicitly[WeightExtractor[T]].apply(item)

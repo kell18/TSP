@@ -1,10 +1,13 @@
-## 0.13.1-rc1
-
+## 0.13.2
+Fix problem with earlier states termination
+## 0.13.1
+- Added new syntax for `for TIME` expressions: `x for t TIME +- (TIME | PERCENT)` and
+`x for t1 to t2 TIME` to time with tolerance and time range accordingly
 ## 0.13.1-rc1
 - Huge internal refactor for maintainability of the code
 - Add some docs about parallelisation
 - Migrated to Scala 2.12, Flink 1.7 and Spark 2.4
-## 0.13.0
+
 
 ## 0.13.0-rc3
 - Add some docs about parallelisation
@@ -53,7 +56,7 @@ in columns, instead of setting a separate column for each key)
 - New `lag(x, t sec)` pattern added to get value back `t sec` ago
 - More mathematical functions added
 - Updates of API docs
-- Changelogs mechanism implemented 
+- Changelogs mechanism implemented
 - Internal tests
 
 ## 0.12.3-test
