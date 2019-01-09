@@ -2,19 +2,12 @@ package ru.itclover.tsp.streaming
 
 import scala.reflect.ClassTag
 import cats.Semigroup
+import ru.itclover.tsp.core.{Incident, IncidentId}
 import ru.itclover.tsp.io.TimeExtractor
 import scala.language.higherKinds
 
-trait Stream {
-  type S[_]
-  type KeyedS[_, _] <: S[_]
-  type TypeInfo[_]
-}
 
 trait StreamAlg[S[_], KeyedS[_, _] <: S[_], TypeInfo[_]] {
-
-  def createStream[In, Key, Item](source: Source[In, Key, Item, S]): S[In]
-
   def keyBy[In, K: TypeInfo](stream: S[In])(partitioner: In => K, maxPartitions: Int): KeyedS[In, K]
 
   def map[In, Out: TypeInfo, State](stream: S[In])(f: In => Out): S[Out]
@@ -26,4 +19,14 @@ trait StreamAlg[S[_], KeyedS[_, _] <: S[_], TypeInfo[_]] {
   def reduceNearby[In: Semigroup: TimeExtractor, K](stream: KeyedS[In, K])(getSessionSizeMs: K => Long): S[In]
 
   def addSink[T](stream: S[T])(sink: Sink[T]): S[T]
+}
+
+/**
+  *
+  * @tparam TypeInfo
+  */
+trait TypeInfoSet[TypeInfo[_]] {
+  implicit def incident: TypeInfo[Incident]
+  implicit def incidentId: TypeInfo[IncidentId]
+  implicit def string: TypeInfo[String]
 }

@@ -7,12 +7,10 @@ import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import com.typesafe.scalalogging.Logger
 import fs2.{Chunk, Stream}
 import ru.itclover.tsp.io.TimeExtractor
-import ru.itclover.tsp.streaming.{Source, StatefulFlatMapper, StreamAlg}
+import ru.itclover.tsp.streaming.{StatefulFlatMapper, StreamAlg}
 import ru.itclover.tsp.utils.Fs2Ops.{groupBy, reduceLeft}
 import ru.itclover.tsp.Fs2StreamAlg.{KeyedStream, NoTypeInfo}
 import scala.language.higherKinds
-
-// .. Commit, Make source and sink, Run! :)
 
 object Fs2StreamAlg {
   type NoTypeInfo[T] = Nothing
@@ -28,10 +26,6 @@ case class Fs2StreamAlg[F[_]](maxChunkSize: Int = 1024, maxSessionSize: Int = 10
   import Fs2StreamAlg._
 
   val log = Logger[Fs2StreamAlg[F]]
-
-  def createStream[In, Key, Item](
-    source: Source[In, Key, Item, Stream[F, +?]]
-  ) = source.createStream
 
   def keyBy[In, K: NoTypeInfo](stream: Stream[F, In])(partitioner: In => K, maxPartitions: Int) = {
     log.info("Ignoring maxPartitions arg, current Fs2.keyBy algorithm doesn't support on-disk keys spilling.")

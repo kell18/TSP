@@ -7,9 +7,9 @@ import ru.itclover.tsp.Segment
   * Represents found pattern
   *
   * @param id from input conf
-  * @param maxWindowMs maximum time-window (accum, aggregation) inside
   * @param segment bounds of incident
   * @param forwardedFields which fields need to push to sink
+  * @param patternPayload specific values to write in JSON (or similar) payload field
   */
 case class Incident(
   id: IncidentId,

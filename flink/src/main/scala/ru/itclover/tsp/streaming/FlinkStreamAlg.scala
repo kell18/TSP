@@ -14,13 +14,6 @@ import scala.reflect.ClassTag
 
 case class FlinkStreamAlg() extends StreamAlg[DataStream, KeyedStream, TypeInformation] {
 
-  override def createStream[In, Key, Item](source: Source[In, Key, Item, DataStream]) = {
-    val extractor = source.timeExtractor
-    source
-      .createStream
-      .assignAscendingTimestamps(x => extractor.apply(x).toMillis)
-  }
-
   override def keyBy[In, K: TypeInformation](stream: DataStream[In])(partitioner: In => K, maxPartitions: Int): KeyedStream[In, K] =
     stream
       .setMaxParallelism(maxPartitions) // .. todo(1) check is correct (ConcModEx)
@@ -42,8 +35,8 @@ case class FlinkStreamAlg() extends StreamAlg[DataStream, KeyedStream, TypeInfor
       .getKeySelector
     stream
       .window(EventTimeSessionWindows.withDynamicGap { el: In =>
-        val key = selector.getKey(el)
-        getSessionSizeMs(key)
+         val key = selector.getKey(el)
+         getSessionSizeMs(key)
       })
       .reduce { (a: In, b: In) => a |+| b }
       .name("Uniting adjacent items")

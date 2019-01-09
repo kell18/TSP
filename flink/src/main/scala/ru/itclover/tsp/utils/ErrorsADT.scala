@@ -1,4 +1,5 @@
 package ru.itclover.tsp.utils
+import com.typesafe.scalalogging.Logger
 
 object ErrorsADT {
 
@@ -33,6 +34,9 @@ object ErrorsADT {
   sealed trait RuntimeErr extends Err
 
   case class GenericRuntimeErr(ex: Throwable, errorCode: Int = 5000) extends RuntimeErr {
+    val log = Logger[GenericRuntimeErr]
+    log.error(Exceptions.getStackTrace(ex))
+
     override val error = Option(ex.getMessage).getOrElse(ex.toString)
   }
 

@@ -21,23 +21,26 @@ import scala.language.higherKinds
 // .. type factory
 case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], TypeInfo[_]](
   streamAlg: StreamAlg[S, KeyedS, TypeInfo],
-  source: Source[In, InKey, InItem, S],
-  decoders: BasicDecoders[InItem]
-)(implicit incidentTI: TypeInfo[Incident], incidentIdTI: TypeInfo[IncidentId], strTI: TypeInfo[String]) {
+  srcConf: SourceConf[In, InKey, InItem],
+  srcFactory: Source[S, In, SourceConf[In, InKey, InItem]],
+  decoders: BasicDecoders[InItem],
+  typeInfoSet: TypeInfoSet[TypeInfo]
+) {
 
+  import srcConf.{extractor, timeExtractor}
   import decoders._
-  import source.{extractor, timeExtractor}
+  import typeInfoSet._
   import PatternsSearchJob._
 
-  val maxPartitions = source.conf.maxPartitions
+  val maxPartitions = srcConf.inpConf.maxPartitions
 
   def patternsSearchStream[OutE: TypeInfo, OutKey](
     rawPatterns: Seq[RawPattern],
     sink: Sink[OutE],
     resultMapper: Incident => OutE
   ): Either[ConfigErr, (Seq[RichPattern[In]], Vector[S[OutE]])] = {
-    preparePatterns[In, InKey, InItem](rawPatterns, source.fieldToEKey, source.conf.defaultToleranceFraction.getOrElse(0)) map { patterns =>
-      val forwardFields = sink.conf.forwardedFieldsIds.map(id => (id, source.fieldToEKey(id)))
+    preparePatterns[In, InKey, InItem](rawPatterns, srcConf.fieldToEKey, srcConf.inpConf.defaultToleranceFraction.getOrElse(0)) map { patterns =>
+      val forwardFields = sink.conf.forwardedFieldsIds.map(id => (id, srcConf.fieldToEKey(id)))
       val incidents = cleanIncidentsFromPatterns(patterns, forwardFields)
       val mapped = incidents.map(x => streamAlg.map(x)(resultMapper))
       (patterns, mapped.map(m => streamAlg.addSink(m)(sink)))
@@ -49,18 +52,19 @@ case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], Type
     forwardedFields: Seq[(Symbol, InKey)]
   ): Vector[S[Incident]] =
     for {
-      sourceBucket   <- bucketizePatterns(richPatterns, source.conf.numParallelSources.getOrElse(1))
-      stream         =  streamAlg.createStream(source)
-      patternsBucket <- bucketizePatterns(sourceBucket.items, source.conf.patternsParallelism.getOrElse(1))
+      sourceBucket   <- bucketizePatterns(richPatterns, srcConf.inpConf.numParallelSources.getOrElse(1))
+      stream         =  srcFactory.create(srcConf)
+      patternsBucket <- bucketizePatterns(sourceBucket.items, srcConf.inpConf.patternsParallelism.getOrElse(1))
     } yield {
       val singleIncidents = incidentsFromPatterns(stream, patternsBucket.items, forwardedFields)
 
-      if (source.conf.defaultEventsGapMs > 0L) {
+      if (srcConf.inpConf.defaultEventsGapMs > 0L) {
         val keyedIncidents = streamAlg.keyBy(singleIncidents)(_.id, maxPartitions)
+        val gap = srcConf.inpConf.defaultEventsGapMs
         val patternsToWindows = richPatterns.map { case ((_, meta), raw) => raw.id -> meta.maxWindowMs }.toMap
         streamAlg.reduceNearby(keyedIncidents)(inc =>
           // Get max window of pattern, or, if it is = 0 - defaultEventsGapMs from conf
-          patternsToWindows.get(inc.patternId).filter(_ > 0L).getOrElse(source.conf.defaultEventsGapMs)
+          patternsToWindows.get(inc.patternId).filter(_ > 0L).getOrElse(gap)
         )
       } else
         singleIncidents
@@ -73,21 +77,21 @@ case class PatternsSearchJob[In, InKey, InItem, S[_], KeyedS[_, _] <: S[_], Type
   ): S[Incident] = {
     val mappers: Seq[StatefulFlatMapper[In, Any, Incident]] = patterns.map {
       case ((pattern, meta), rawP) =>
-        val allForwardFields = forwardedFields ++ rawP.forwardedFields.map(id => (id, source.fieldToEKey(id)))
+        val allForwardFields = forwardedFields ++ rawP.forwardedFields.map(id => (id, srcConf.fieldToEKey(id)))
         val toIncidents = ToIncidentsMapper(
           rawP.id,
           allForwardFields.map { case (id, k) => id.toString.tail -> k },
           rawP.payload.toSeq,
-          source.conf.partitionFields.map(source.fieldToEKey)
+          srcConf.inpConf.partitionFields.map(srcConf.fieldToEKey)
         )
         PatternFlatMapper(
           pattern,
           toIncidents.apply,
-          source.conf.eventsMaxGapMs,
-          source.emptyEvent
+          srcConf.inpConf.eventsMaxGapMs,
+          srcConf.emptyEvent
         )(timeExtractor).asInstanceOf[StatefulFlatMapper[In, Any, Incident]]
     }
-    val keyed = streamAlg.keyBy(stream)(source.partitioner, maxPartitions)
+    val keyed = streamAlg.keyBy(stream)(srcConf.partitioner, maxPartitions)
     streamAlg.flatMapWithState(keyed)(mappers)
   }
 }

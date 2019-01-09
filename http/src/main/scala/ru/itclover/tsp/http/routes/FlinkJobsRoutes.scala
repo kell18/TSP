@@ -22,13 +22,13 @@ import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.api.TimeCharacteristic
+import org.apache.flink.types.Row
 import ru.itclover.tsp.core.{Incident, IncidentId, Pattern, RawPattern}
 import ru.itclover.tsp.http.domain.output.SuccessfulResponse.ExecInfo
 import ru.itclover.tsp.http.services.flink.MonitoringService
 import ru.itclover.tsp.io.{AnyDecodersInstances, BasicDecoders}
 import ru.itclover.tsp.utils.ErrorsADT.{ConfigErr, Err, GenericRuntimeErr, RuntimeErr}
-import ru.itclover.tsp.streaming._
-import scala.util.Try
+import ru.itclover.tsp.streaming.{Source, _}
 
 object FlinkJobsRoutes {
 
@@ -53,8 +53,8 @@ trait FlinkJobsRoutes extends RoutesProtocols {
   implicit val streamEnv: StreamExecutionEnvironment
   implicit val actorSystem: ActorSystem
   implicit val materializer: ActorMaterializer
-  implicit val decoders = AnyDecodersInstances
 
+  val algebra = FlinkStreamAlg()
   val monitoringUri: Uri
   lazy val monitoring = MonitoringService(monitoringUri)
 
@@ -66,10 +66,11 @@ trait FlinkJobsRoutes extends RoutesProtocols {
         import request._
 
         val resultOrErr = for {
-          source <- JdbcSource.create(inputConf)
-          sink   <- JdbcSink.create(request.outConf)
-          _      <- createJobGraph(patterns, source, sink)
-          result <- runStream(uuid, isAsync)
+          srcConf    <- JdbcSourceConf.create(inputConf)
+          srcFactory =  FlinkSources.jdbc(streamEnv).asInstanceOf[Source[DataStream, Row, SourceConf[Row, Int, Any]]]
+          sink       <- JdbcSink.create(request.outConf)
+          _          <- createJobGraph[Row, Int](patterns, srcConf, srcFactory, sink)
+          result     <- runStream(uuid, isAsync)
         } yield result
 
         matchResultToResponse(resultOrErr, uuid)
@@ -80,10 +81,11 @@ trait FlinkJobsRoutes extends RoutesProtocols {
         import request._
 
         val resultOrErr = for {
-          source <- InfluxDBSource.create(inputConf)
-          sink   <- JdbcSink.create(request.outConf)
-          _      <- createJobGraph(patterns, source, sink)
-          result <- runStream(uuid, isAsync)
+          srcConf    <- InfluxDBSourceConf.create(inputConf)
+          srcFactory =  FlinkSources.influx(streamEnv).asInstanceOf[Source[DataStream, Row, SourceConf[Row, Int, Any]]]
+          sink       <- JdbcSink.create(request.outConf)
+          _          <- createJobGraph(patterns, srcConf, srcFactory, sink)
+          result     <- runStream(uuid, isAsync)
         } yield result
 
         matchResultToResponse(resultOrErr, uuid)
@@ -91,25 +93,21 @@ trait FlinkJobsRoutes extends RoutesProtocols {
     }
   }
 
-
-  def createJobGraph[E, EKey, EItem](
+  def createJobGraph[E, EKey](
     patterns: Seq[RawPattern],
-    source: Source[E, EKey, EItem, DataStream],
+    srcConf: SourceConf[E, EKey, Any],
+    srcFactory: Source[DataStream, E, SourceConf[E, EKey, Any]],
     sink: JdbcSink
-  )(implicit decoders: BasicDecoders[EItem]) = {
+  ) = {
     streamEnv.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-    val searcher = PatternsSearchJob(FlinkStreamAlg(), source, decoders)(
-      TypeInformation.of(classOf[Incident]),
-      TypeInformation.of(classOf[IncidentId]),
-      TypeInformation.of(classOf[String])
-    )
+    val searcher = PatternsSearchJob(algebra, srcConf, srcFactory, AnyDecodersInstances, typeInfoSet)
     searcher.patternsSearchStream(
       patterns,
       sink,
-      PatternsToRowMapper(source.conf.sourceId, sink.conf.rowSchema).apply
+      PatternsToRowMapper(srcConf.inpConf.sourceId, sink.conf.rowSchema).apply
     ) map {
       case (parsedPatterns, stream) =>
-        val strPatterns = parsedPatterns.map { case ((p, meta), _) => p.format(source.emptyEvent) + s" ;; Meta=$meta" }
+        val strPatterns = parsedPatterns.map { case ((p, meta), _) => p.format(srcConf.emptyEvent) + s" ;; Meta=$meta" }
         log.info(s"Parsed patterns:\n${strPatterns.mkString(";\n")}")
         stream
     }
@@ -136,5 +134,13 @@ trait FlinkJobsRoutes extends RoutesProtocols {
         complete(SuccessfulResponse(ExecInfo(execTime, Map.empty)))
       }
     }
+
+  val typeInfoSet = new TypeInfoSet[TypeInformation] {
+    implicit override def incident = TypeInformation.of(classOf[Incident])
+
+    implicit override def incidentId = TypeInformation.of(classOf[IncidentId])
+
+    implicit override def string = TypeInformation.of(classOf[String])
+  }
 
 }
