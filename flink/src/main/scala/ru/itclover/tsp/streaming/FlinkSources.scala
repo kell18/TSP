@@ -9,18 +9,19 @@ import scala.collection.JavaConverters._
 
 object FlinkSources {
 
-  def jdbc(env: StreamExecutionEnvironment) = (src: JdbcSourceConf) => {
-    import src._
-    val extractor = src.timeExtractor
-    val stream = env
-      .createInput(inputFormat)(rowTypesInfo)
-      .assignAscendingTimestamps(x => extractor.apply(x).toMillis)
-      .name(stageName)
-    inpConf.parallelism match {
-      case Some(p) => stream.setParallelism(p)
-      case None    => stream
+  def jdbc(env: StreamExecutionEnvironment): Source[DataStream, Row, JdbcSourceConf] =
+    (src: JdbcSourceConf) => {
+      import src._
+      val extractor = src.timeExtractor
+      val stream = env
+        .createInput(inputFormat)(rowTypesInfo)
+        .assignAscendingTimestamps(x => extractor.apply(x).toMillis)
+        .name(stageName)
+      inpConf.parallelism match {
+        case Some(p) => stream.setParallelism(p)
+        case None    => stream
+      }
     }
-  }
 
 
   def influx(env: StreamExecutionEnvironment): Source[DataStream, Row, InfluxDBSourceConf] =
