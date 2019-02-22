@@ -25,6 +25,7 @@ object Version {
   val scalaCheck = "1.14.0"
   val testContainers = "0.20.0"
   val postgres = "42.2.5"
+  val tarantool = "1.9.0"
 
   val spark = "2.4.0"
 
@@ -66,7 +67,8 @@ object Library {
   )
   val clickhouse = Seq("ru.yandex.clickhouse" % "clickhouse-jdbc" % Version.clickhouse)
   val postgre = Seq("org.postgresql" % "postgresql" % Version.postgres)
-  val dbDrivers = influx ++ clickhouse ++ postgre
+  val tarantool = Seq("org.tarantool" % "connector" % Version.tarantool)
+  val dbDrivers = influx ++ clickhouse ++ postgre ++ tarantool
 
   val flinkCore = Seq("org.apache.flink" %% "flink-scala" % Version.flink)
 
@@ -129,4 +131,5 @@ object Library {
   val monix = Seq(
     "io.monix" %% "monix" % "3.0.0-RC2"
   )
+
 }
