@@ -3,36 +3,33 @@ import sbt._
 
 object Version {
   val logback = "1.2.3"
-  val scalaLogging = "3.9.0"
+  val scalaLogging = "3.9.2"
 
   val config = "1.3.3"
 
-  val influx = "2.13"
-  val influxCli = "0.6.0"
-  val influxFlink = "1.0"
+  val influx = "2.15"
 
-  val clickhouse = "0.1.48"
+  val clickhouse = "0.1.50"
   val flink = "1.7.2"
 
-  val akka = "2.5.19"
-  val akkaHttp = "10.1.5"
+  val akka = "2.5.21"
+  val akkaHttp = "10.1.8"
 
   val cats = "1.6.0"
 
   val twitterUtilVersion = "6.43.0"
 
-  val scalaTest = "3.0.5"
+  val scalaTest = "3.0.7"
   val scalaCheck = "1.14.0"
-  val testContainers = "0.20.0"
+  val testContainers = "0.23.0"
   val postgres = "42.2.5"
 
   val avro = "1.8.2"
 
   val parboiled = "2.1.5"
 
-  val shapeless = "2.3.3"
 
-  val jackson = "2.9.7"
+  val jackson = "2.9.8"
   val jaxb = "2.3.0"
   val activation = "1.2.0"
 
@@ -118,11 +115,11 @@ object Library {
     "org.parboiled" %% "parboiled" % Version.parboiled
   )
 
-  val shapeless = Seq(
-    "com.chuusai" %% "shapeless" % Version.shapeless
-  )
-
-  val monix = Seq(
-    "io.monix" %% "monix" % "3.0.0-RC2"
-  )
+//  val shapeless = Seq(
+//    "com.chuusai" %% "shapeless" % Version.shapeless
+//  )
+//
+//  val monix = Seq(
+//    "io.monix" %% "monix" % "3.0.0-RC2"
+//  )
 }
