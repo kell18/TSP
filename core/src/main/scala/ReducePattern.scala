@@ -1,6 +1,8 @@
 package ru.itclover.tsp.v2
 import cats.{Foldable, Functor, Monad}
 import cats.implicits._
+import ru.itclover.tsp.core.Time.MinWindow
+import ru.itclover.tsp.core.Window
 import ru.itclover.tsp.v2.Pattern.QI
 
 import scala.annotation.tailrec
@@ -16,6 +18,8 @@ class ReducePattern[Event, S <: PState[T1, S], T1, T2](
   filterCond: Result[T1] => Boolean,
   initial: Result[T2]
 ) extends Pattern[Event, ReducePState[S, T1, T2], T2] {
+
+  private var maxWindow: Window = MinWindow
 
   override def apply[F[_]: Monad, Cont[_]: Foldable: Functor](
     oldState: ReducePState[S, T1, T2],
@@ -34,6 +38,13 @@ class ReducePattern[Event, S <: PState[T1, S], T1, T2](
       )
     }
   }
+
+  override def setMaxWindow(window: Window): Unit = {
+    this.maxWindow = window
+    patterns.foreach(p => p.setMaxWindow(window))
+  }
+
+  override def maxWindowWhichWasSet: Window = this.maxWindow
 
   private def processQueues(qs: Seq[QI[T1]], resultQ: QI[T2]): (Seq[QI[T1]], QI[T2]) = {
 

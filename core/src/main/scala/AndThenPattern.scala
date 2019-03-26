@@ -2,7 +2,9 @@ package ru.itclover.tsp.v2
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.{Foldable, Functor, Monad, Order}
-import ru.itclover.tsp.v2.Pattern.{Idx, QI}
+import ru.itclover.tsp.core.Time.{MaxWindow, MinWindow}
+import ru.itclover.tsp.core.Window
+import ru.itclover.tsp.v2.Pattern.{Idx, QI, TsIdxExtractor}
 
 import scala.annotation.tailrec
 import scala.collection.{mutable => m}
@@ -10,12 +12,14 @@ import scala.language.higherKinds
 
 /** AndThen  */
 //We lose T1 and T2 in output for performance reason only. If needed outputs of first and second stages can be returned as well
-case class AndThenPattern[Event, T1, T2, S1 <: PState[T1, S1], S2 <: PState[T2, S2]](
+case class AndThenPattern[Event: TsIdxExtractor, T1, T2, S1 <: PState[T1, S1], S2 <: PState[T2, S2]](
   first: Pattern[Event, S1, T1],
   second: Pattern[Event, S2, T2]
 )(
   implicit idxOrd: Order[Idx]
 ) extends Pattern[Event, AndThenPState[T1, T2, S1, S2], (Idx, Idx)] {
+
+  private var maxWindow: Window = MaxWindow
 
   def apply[F[_]: Monad, Cont[_]: Foldable: Functor](
     oldState: AndThenPState[T1, T2, S1, S2],
@@ -30,7 +34,11 @@ case class AndThenPattern[Event, T1, T2, S1 <: PState[T1, S1], S2 <: PState[T2, 
       yield {
         // process queues
         val (updatedFirstQueue, updatedSecondQueue, finalQueue) =
-          process(newFirstState.queue, newSecondState.queue, oldState.queue)
+          process(
+            newFirstState.queue, //purgeQueue[T1, S1](newFirstState, maxWindow).queue,
+            newSecondState.queue, //purgeQueue[T2, S2](newSecondState, maxWindow).queue,
+            purgeQueue[(Idx, Idx), AndThenPState[T1, T2, S1, S2]](oldState, maxWindow).queue
+          )
 
         AndThenPState(
           newFirstState.copyWithQueue(updatedFirstQueue),
@@ -42,6 +50,14 @@ case class AndThenPattern[Event, T1, T2, S1 <: PState[T1, S1], S2 <: PState[T2, 
 
   override def initialState(): AndThenPState[T1, T2, S1, S2] =
     AndThenPState(first.initialState(), second.initialState(), m.Queue.empty)
+
+  override def setMaxWindow(window: Window): Unit = {
+    this.maxWindow = window
+    first.setMaxWindow(window)
+    second.setMaxWindow(window)
+  }
+
+  override def maxWindowWhichWasSet: Window = this.maxWindow
 
   private def process(firstQ: QI[T1], secondQ: QI[T2], totalQ: QI[(Idx, Idx)]): (QI[T1], QI[T2], QI[(Idx, Idx)]) = {
 

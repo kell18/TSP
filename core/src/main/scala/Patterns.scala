@@ -2,13 +2,13 @@ package ru.itclover.tsp.v2
 import cats.{Foldable, Functor, Group, Monad}
 import ru.itclover.tsp.core.Window
 import ru.itclover.tsp.io.TimeExtractor
-import ru.itclover.tsp.v2.Pattern.IdxExtractor
+import ru.itclover.tsp.v2.Pattern.{IdxExtractor, TsIdxExtractor}
 import ru.itclover.tsp.v2.aggregators.{GroupPattern, PreviousValue, TimerPattern, WindowStatistic}
 
 import scala.language.higherKinds
 
 //todo refactor it later on
-abstract class Patterns[E: IdxExtractor: TimeExtractor] {
+abstract class Patterns[E: TsIdxExtractor: TimeExtractor] {
 
   type Pat[State <: PState[Out, State], Out] = Pattern[E, State, Out]
 

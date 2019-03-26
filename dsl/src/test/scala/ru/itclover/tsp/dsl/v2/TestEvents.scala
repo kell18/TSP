@@ -1,7 +1,7 @@
 package ru.itclover.tsp.dsl.v2
 import ru.itclover.tsp.core.Time
 import ru.itclover.tsp.io.{Decoder, Extractor, TimeExtractor}
-import ru.itclover.tsp.v2.Pattern.{Idx, IdxExtractor}
+import ru.itclover.tsp.v2.Pattern.{Idx, IdxExtractor, TsIdxExtractor}
 
 object TestEvents {
   case class TestEvent(
@@ -18,6 +18,9 @@ object TestEvents {
     override def apply(e: TestEvent): Idx = e.time
     override def compare(x: Idx, y: Idx): Int = x.compare(y)
   }
+
+  implicit val tsIdxExtractor: TsIdxExtractor[TestEvent] = new TsIdxExtractor[TestEvent](_.time)
+
   implicit val extractor: Extractor[TestEvent, Symbol, Any] = new Extractor[TestEvent, Symbol, Any] {
     override def apply[T](e: TestEvent, k: Symbol)(
       implicit d: Decoder[Any, T]

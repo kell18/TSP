@@ -56,9 +56,9 @@ case class PatternsSearchJob[In, InKey, InItem](
       source.fieldToEKey,
       source.conf.defaultToleranceFraction.getOrElse(0),
       source.fieldsClasses.map { case (s, c) => s -> ClassTag(c) }.toMap
-    ) map { patterns =>
+    ) map { case (patterns, ex) =>
       val forwardFields = outputConf.forwardedFieldsIds.map(id => (id, source.fieldToEKey(id)))
-      val incidents = cleanIncidentsFromPatterns(patterns, forwardFields)
+      val incidents = cleanIncidentsFromPatterns(patterns, forwardFields)(ex)
       val mapped = incidents.map(x => x.map(resultMapper))
       (patterns, mapped.map(m => saveStream(m, outputConf)))
     }
@@ -66,7 +66,7 @@ case class PatternsSearchJob[In, InKey, InItem](
   def cleanIncidentsFromPatterns(
     richPatterns: Seq[RichPattern[In, Segment, AnyState[Segment]]],
     forwardedFields: Seq[(Symbol, InKey)]
-  ): Vector[DataStream[Incident]] =
+  )(implicit tsIdxExtractor: TsIdxExtractor[In]): Vector[DataStream[Incident]] =
     for {
       sourceBucket <- bucketizePatterns(richPatterns, source.conf.numParallelSources.getOrElse(1))
       stream = source.createStream
@@ -80,7 +80,7 @@ case class PatternsSearchJob[In, InKey, InItem](
     stream: DataStream[In],
     patterns: Seq[RichPattern[In, Segment, S]],
     forwardedFields: Seq[(Symbol, InKey)]
-  ): DataStream[Incident] = {
+  )(implicit tsIdxExtractor: TsIdxExtractor[In]): DataStream[Incident] = {
     val mappers: Seq[PatternProcessor[In, S, Segment, Incident]] = patterns.map {
       case ((pattern, meta), rawP) =>
         val allForwardFields = forwardedFields ++ rawP.forwardedFields.map(id => (id, source.fieldToEKey(id)))
@@ -96,7 +96,7 @@ case class PatternsSearchJob[In, InKey, InItem](
           toIncidents.apply,
           source.conf.eventsMaxGapMs,
           source.emptyEvent
-        )(timeExtractor) //.asInstanceOf[StatefulFlatMapper[In, S, Incident]]
+        )(tsIdxExtractor, timeExtractor) //.asInstanceOf[StatefulFlatMapper[In, S, Incident]]
     }
     stream
       .assignAscendingTimestamps(timeExtractor(_).toMillis)
@@ -128,7 +128,7 @@ object PatternsSearchJob {
     implicit extractor: Extractor[E, EKey, EItem],
     getTime: TimeExtractor[E],
     dDecoder: Decoder[EItem, Double]
-  ): Either[ConfigErr, List[RichPattern[E, Segment, AnyState[Segment]]]] = {
+  ): Either[ConfigErr, (List[RichPattern[E, Segment, AnyState[Segment]]], TsIdxExtractor[E])] = {
     implicit val tsToIdx = new TsIdxExtractor[E](getTime(_).toMillis)
     implicit val impFIM = fieldsIdxMap
     val pGenerator = ASTPatternGenerator[E, EKey, EItem]()(tsToIdx, getTime, extractor, fieldsIdxMap, tsToIdx)
@@ -144,7 +144,7 @@ object PatternsSearchJob {
         // TODO@trolley813 TimeMeasurementPattern wrapper for v2.Pattern
       )
       .leftMap[ConfigErr](InvalidPatternsCode(_))
-      .map(_.zip(rawPatterns))
+      .map(x => (x.zip(rawPatterns), tsToIdx))
       .toEither
   }
 

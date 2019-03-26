@@ -3,16 +3,15 @@ package ru.itclover.tsp.mappers
 import cats.Id
 import org.apache.flink.util.Collector
 import ru.itclover.tsp.io.TimeExtractor
-import ru.itclover.tsp.v2.Pattern.QI
+import ru.itclover.tsp.v2.Pattern.{QI, TsIdxExtractor}
 import ru.itclover.tsp.v2.{PState, Pattern, StateMachine, Succ}
 
 import scala.collection.mutable.ListBuffer
 import scala.language.reflectiveCalls
-
 import com.typesafe.scalalogging.Logger
 
 
-case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
+case class PatternProcessor[E: TsIdxExtractor, State <: PState[Inner, State], Inner, Out](
   pattern: Pattern[E, State, Inner], //todo Why List?
   mapResults: (E, Seq[Inner]) => Seq[Out],
   eventsMaxGapMs: Long,
@@ -31,6 +30,9 @@ case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
     elements: Iterable[E],
     out: Collector[Out]
   ): Unit = {
+    // Clean the last state
+    lastState = pattern.purgeQueue[Inner, State](lastState, pattern.maxWindowWhichWasSet)
+    //log.error(s"LAST STATE SIZE = ${lastState.queue.size}")
     // Split the different time sequences if they occurred in the same time window
     val sequences = PatternProcessor.splitByCondition(
       elements.toList,
@@ -40,16 +42,17 @@ case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
       .run(pattern, sequences.headOption.getOrElse(sys.error("Empty sequence list")), lastState) :: sequences.tail.map(
       StateMachine[Id].run(pattern, _, pattern.initialState())
     )
-    lastState = states.lastOption.getOrElse(sys.error("Empty state list"))
-    val results = states.map(_.queue).foldLeft(List.empty[Inner]) { (acc: List[Inner], q: QI[Inner]) =>
+    lastState = states.lastOption.getOrElse(pattern.initialState())
+    val results = states.map(_.queue).foldLeft(Set.empty[Inner]) { (acc: Set[Inner], q: QI[Inner]) =>
       acc ++ q.map(_.value).collect { case Succ(v) => v }
     }
+    //log.error(s"RESULTS SIZE = ${results.size}")
     if (elements.nonEmpty)
       mapResults(
         elements.headOption.getOrElse(
           sys.error("Non-empty collection but still cannot get the head for some cryptic reason")
         ),
-        results
+        results.toList
       ).foreach(out.collect)
   }
 }

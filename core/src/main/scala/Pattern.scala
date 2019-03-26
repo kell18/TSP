@@ -1,6 +1,7 @@
 package ru.itclover.tsp.v2
 
 import cats.{Foldable, Functor, Monad, Order}
+import ru.itclover.tsp.core.Window
 import ru.itclover.tsp.v2.Pattern.{Idx, _}
 
 import scala.collection.{mutable => m}
@@ -30,6 +31,28 @@ trait Pattern[Event, S <: PState[T, S], T] extends Serializable {
     * @return
     */
   def apply[F[_]: Monad, Cont[_]: Foldable: Functor](oldState: S, events: Cont[Event]): F[S]
+
+  def purgeQueue[PT, PS <: PState[PT, PS]](s: PS, maxWindow: Window)(implicit extractor: TsIdxExtractor[Event]): PS = {
+    if (s.queue.size < 2) {
+      s
+    } else {
+      val lastIndex = s.queue.map(_.index).reduceOption(_ max _)
+      lastIndex match {
+        case Some(index) =>
+          val lastUsedIndex = s.queue.filter(iv => extractor.idxToTs(index) - extractor.idxToTs(iv.index) > maxWindow.toMillis).map(_.index)
+              .reduceOption(_ max _).getOrElse(Long.MinValue)
+          s.copyWithQueue(s.queue.filter(iv => iv.index > lastUsedIndex))
+        case None => s
+      }
+    }
+  }
+
+  // Set the maximum possible window and propagates it to all inner patterns
+  // Non-FP style, probably needs something nicer
+  def setMaxWindow(window: Window)
+
+  // Get maxWindow which was set in `maxWindow`
+  def maxWindowWhichWasSet: Window
 }
 
 trait IdxValue[+T] {

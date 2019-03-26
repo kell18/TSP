@@ -58,6 +58,10 @@ abstract class AccumPattern[
       )
   }
 
+  override def setMaxWindow(window: Window): Unit = innerPattern.setMaxWindow(window)
+
+  override def maxWindowWhichWasSet: Window = innerPattern.maxWindowWhichWasSet
+
   private def processQueue(
     innerS: Inner,
     accumState: AState,

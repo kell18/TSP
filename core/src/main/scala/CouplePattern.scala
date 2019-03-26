@@ -3,14 +3,16 @@ package ru.itclover.tsp.v2
 import cats.{Foldable, Functor, Monad, Order}
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import ru.itclover.tsp.v2.Pattern.{Idx, QI}
+import ru.itclover.tsp.core.Time.{MaxWindow, MinWindow}
+import ru.itclover.tsp.core.Window
+import ru.itclover.tsp.v2.Pattern.{Idx, QI, TsIdxExtractor}
 
 import scala.annotation.tailrec
 import scala.collection.{mutable => m}
 import scala.language.higherKinds
 
 /** Couple Pattern */
-class CouplePattern[Event, State1 <: PState[T1, State1], State2 <: PState[T2, State2], T1, T2, T3](
+class CouplePattern[Event: TsIdxExtractor, State1 <: PState[T1, State1], State2 <: PState[T2, State2], T1, T2, T3](
   left: Pattern[Event, State1, T1],
   right: Pattern[Event, State2, T2]
 )(
@@ -18,6 +20,16 @@ class CouplePattern[Event, State1 <: PState[T1, State1], State2 <: PState[T2, St
 )(
   implicit idxOrd: Order[Idx]
 ) extends Pattern[Event, CouplePState[State1, State2, T1, T2, T3], T3] {
+  private var maxWindow: Window = MaxWindow
+
+  override def setMaxWindow(window: Window): Unit = {
+    this.maxWindow = window
+    left.setMaxWindow(window)
+    right.setMaxWindow(window)
+  }
+
+  override def maxWindowWhichWasSet: Window = this.maxWindow
+
   override def apply[F[_]: Monad, Cont[_]: Foldable: Functor](
     oldState: CouplePState[State1, State2, T1, T2, T3],
     events: Cont[Event]
@@ -28,7 +40,11 @@ class CouplePattern[Event, State1 <: PState[T1, State1], State2 <: PState[T2, St
          newRightState <- rightF) yield {
       // Build a new queue from the left and right ones
       val (updatedLeftQueue, updatedRightQueue, newFinalQueue) =
-        processQueues(newLeftState.queue, newRightState.queue, oldState.queue)
+        processQueues(
+          newLeftState.queue, //purgeQueue[T1, State1](newLeftState, maxWindow).queue,
+          newRightState.queue, //purgeQueue[T2, State2](newRightState, maxWindow).queue,
+          purgeQueue[T3, CouplePState[State1, State2, T1, T2, T3]](oldState, maxWindow).queue
+        )
 
       CouplePState(
         newLeftState.copyWithQueue(updatedLeftQueue),

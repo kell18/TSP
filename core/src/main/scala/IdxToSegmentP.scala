@@ -6,7 +6,7 @@ import cats.implicits._
 
 import scala.collection.{mutable => m}
 import ru.itclover.tsp.Segment
-import ru.itclover.tsp.core.Time
+import ru.itclover.tsp.core.{Time, Window}
 import ru.itclover.tsp.v2.IdxValue.IdxValueSegment
 import ru.itclover.tsp.v2.Pattern.{QI, TsIdxExtractor}
 
@@ -43,6 +43,10 @@ class IdxToSegmentsP[E, Inner, S <: PState[Inner, S]](inner: Pattern[E, S, Inner
       WrappingPState(innerS, newSegments)
     }
   }
+
+  override def setMaxWindow(window: Window): Unit = inner.setMaxWindow(window)
+
+  override def maxWindowWhichWasSet: Window = inner.maxWindowWhichWasSet
 }
 
 /**

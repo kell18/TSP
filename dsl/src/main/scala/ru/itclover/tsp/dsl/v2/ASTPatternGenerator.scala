@@ -5,7 +5,7 @@ import ru.itclover.tsp.core.Intervals.{NumericInterval, TimeInterval}
 import ru.itclover.tsp.core.Window
 import ru.itclover.tsp.dsl.PatternMetadata
 import ru.itclover.tsp.io.{Extractor, TimeExtractor}
-import ru.itclover.tsp.v2.Pattern.{Idx, IdxExtractor}
+import ru.itclover.tsp.v2.Pattern.{Idx, IdxExtractor, TsIdxExtractor}
 import ru.itclover.tsp.v2._
 import ru.itclover.tsp.v2.aggregators.{WindowStatistic, WindowStatisticResult}
 
@@ -19,7 +19,7 @@ import com.typesafe.scalalogging.Logger
 
 
 case class ASTPatternGenerator[Event, EKey, EItem]()(
-  implicit idxExtractor: IdxExtractor[Event],
+  implicit idxExtractor: TsIdxExtractor[Event],
   timeExtractor: TimeExtractor[Event],
   extractor: Extractor[Event, EKey, EItem],
   @transient fieldToEKey: Symbol => EKey,
@@ -44,7 +44,9 @@ case class ASTPatternGenerator[Event, EKey, EItem]()(
     fieldsTags: Map[Symbol, ClassTag[_]]
   ): Either[Throwable, (Pattern[Event, AnyState[Any], Any], PatternMetadata)] = {
     val ast = new ASTBuilder(sourceCode, toleranceFraction, fieldsTags).start.run()
-    ast.toEither.map(a => (generatePattern(a), a.metadata))
+    ast.toEither.map(a => ({ val p = generatePattern(a); p.setMaxWindow(
+      if (a.metadata.sumWindowsMs != 0) Window(a.metadata.sumWindowsMs) else Window(10000L)
+    ); p }, a.metadata))
   
   }
 
