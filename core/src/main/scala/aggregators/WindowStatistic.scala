@@ -19,7 +19,7 @@ case class WindowStatistic[Event: IdxExtractor: TimeExtractor, S <: PState[T, S]
     AggregatorPState(
       innerState = innerPattern.initialState(),
       astate = WindowStatisticAccumState(None, m.Queue.empty),
-      queue = PQueue.empty,
+      queue = m.Queue.empty,
       indexTimeMap = m.Queue.empty
     )
 }
@@ -127,7 +127,7 @@ case class WindowStatisticAccumState[T](
       .getOrElse(finalNewLastValue)
 
     val finalWindowQueue = { updatedWindowQueue.enqueue(newWindowStatisticQueueInstance); updatedWindowQueue }
-    WindowStatisticAccumState(Some(correctedLastValue), finalWindowQueue) -> PQueue(
+    WindowStatisticAccumState(Some(correctedLastValue), finalWindowQueue) -> m.Queue(
       IdxValue(idx, Result.succ(correctedLastValue))
     )
   }

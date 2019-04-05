@@ -11,7 +11,6 @@ import ru.itclover.tsp.v2._
 import scala.annotation.tailrec
 import scala.collection.{mutable => m}
 import scala.language.higherKinds
-import PQueue._
 
 trait AggregatorPatterns[Event, S <: PState[T, S], T] extends Pattern[Event, S, T]
 
@@ -27,15 +26,12 @@ case class AggregatorPState[InnerState, AState <: AccumState[_, Out, AState], Ou
 }
 
 abstract class AccumPattern[
-  Event: IdxExtractor: TimeExtractor,
-  Inner <: PState[InnerOut, Inner],
-  InnerOut,
-  Out,
+  Event: IdxExtractor: TimeExtractor, Inner <: PState[InnerOut, Inner], InnerOut, Out,
   AState <: AccumState[InnerOut, Out, AState]
 ](implicit idxOrd: Order[Idx])
-    extends AggregatorPatterns[Event, AggregatorPState[Inner, AState, Out], Out] {
+    extends AggregatorPatterns[Event, AggregatorPState[Inner, AState, Out],Out] {
 
-  val innerPattern: Pattern[Event, Inner, InnerOut]
+  val innerPattern: Pattern[Event,Inner, InnerOut]
   val window: Window
 
   override def apply[F[_]: Monad, Cont[_]: Foldable: Functor](
@@ -55,7 +51,7 @@ abstract class AccumPattern[
 
           AggregatorPState(
             newInnerState.copyWithQueue(newInnerQueue),
-            newAState, { state.queue.enqueue(newResults.toSeq: _*); state.queue },
+            newAState, { state.queue.enqueue(newResults: _*); state.queue },
             updatedIndexTimeMap
           )(idxOrd)
         }
@@ -86,13 +82,12 @@ abstract class AccumPattern[
           innerFunc(
             updatedQueue,
             newAState,
-            //todo check that .iterator.toSeq is efficient
-            { collectedNewResults.enqueue(newResults.toSeq: _*); collectedNewResults },
+            { collectedNewResults.enqueue(newResults: _*); collectedNewResults },
             updatedIdxTimeMap
           )
       }
 
-    innerFunc(innerS.queue, accumState, PQueue.empty, indexTimeMap)
+    innerFunc(innerS.queue, accumState, m.Queue.empty, indexTimeMap)
   }
 
 }

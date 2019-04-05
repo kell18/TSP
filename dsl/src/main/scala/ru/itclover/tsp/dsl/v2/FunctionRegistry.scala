@@ -19,7 +19,6 @@ trait PReducerTransformation extends (Result[Any] => Result[Any]) with Serializa
 /**
   * Registry for runtime functions
   * Ensure that the result type of the function matches the corresponding ASTType. It's not automatic
-  *
   * @param functions Multi-argument functions (arguments wrapped into a Seq) and their return types
   * @param reducers Reducer functions, their return types and initial values
   */
@@ -37,8 +36,8 @@ object DefaultFunctions {
 
   private def toResult[T](x: Any)(implicit ct: ClassTag[T]): Result[T] = {
     x match {
-      case value: Result[T]                                          => value
-      case value: T                                                  => Result.succ(value)
+      case value: Result[T] => value
+      case value: T => Result.succ(value)
       case value if ct.runtimeClass.isAssignableFrom(value.getClass) => Result.succ(value.asInstanceOf[T])
       case v: Long if (ct.runtimeClass eq classOf[Int]) || (ct.runtimeClass eq classOf[java.lang.Integer]) =>
         Result.succ(v.toInt.asInstanceOf[T]) // we know that T == Int
@@ -57,17 +56,27 @@ object DefaultFunctions {
   ): Map[(Symbol, Seq[ASTType]), (PFunction, ASTType)] = {
     val astType1: ASTType = ASTType.of[T1]
     val astType2: ASTType = ASTType.of[T2]
-    def func(f: (T1, T2) => T1): (PFunction, ASTType) = (
-      (xs: Seq[Any]) =>
-        (toResult[T1](xs.head), toResult[T2](xs(1))) match {
-          case (Succ(t0), Succ(t1)) => Result.succ(f(t0, t1))
-          case _                    => Result.fail
-      },
-      astType1
-    )
     Map(
-      ('add, Seq(astType1, astType2)) -> func(f.plus(_, _)),
-      ('sub, Seq(astType1, astType2)) -> func(f.minus(_, _)),
+      ('add, Seq(astType1, astType2)) -> (
+        (
+          (xs: Seq[Any]) =>
+            (toResult[T1](xs(0)), toResult[T2](xs(1))) match {
+              case (Succ(t0), Succ(t1)) => Result.succ(f.plus(t0, t1))
+              case _                    => Result.fail
+          },
+          astType1
+        )
+      ),
+      ('sub, Seq(astType1, astType2)) -> (
+        (
+          (xs: Seq[Any]) =>
+            (toResult[T1](xs(0)), toResult[T2](xs(1))) match {
+              case (Succ(t0), Succ(t1)) => Result.succ(f.minus(t0, t1))
+              case _                    => Result.fail
+          },
+          astType1
+        )
+      ),
       ('mul, Seq(astType1, astType2)) -> (
         (
           (xs: Seq[Any]) =>

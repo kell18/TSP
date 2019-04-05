@@ -3,7 +3,6 @@ package ru.itclover.tsp.v2.aggregators
 import cats.Group
 import ru.itclover.tsp.core.{Time, Window}
 import ru.itclover.tsp.io.TimeExtractor
-import ru.itclover.tsp.v2.PQueue.MutablePQueue
 import ru.itclover.tsp.v2.Pattern._
 import ru.itclover.tsp.v2.QueueUtils.takeWhileFromQueue
 import ru.itclover.tsp.v2.Result._
@@ -21,7 +20,7 @@ case class GroupPattern[Event: IdxExtractor: TimeExtractor, S <: PState[T, S], T
     AggregatorPState(
       innerState = innerPattern.initialState(),
       astate = GroupAccumState(None, m.Queue.empty),
-      queue = PQueue.empty,
+      queue = m.Queue.empty,
       indexTimeMap = m.Queue.empty
     )
 }
@@ -53,11 +52,9 @@ case class GroupAccumState[T: Group](lastValue: Option[GroupAccumResult[T]], win
 
         val finalWindowQueue = { updatedWindowQueue.enqueue(GroupAccumValue(idx, time, t)); updatedWindowQueue }
 
-        GroupAccumState(finalNewLastValue, finalWindowQueue) -> MutablePQueue(
-          m.Queue(IdxValue(idx, finalNewLastValue.toResult))
-        )
+        GroupAccumState(finalNewLastValue, finalWindowQueue) -> m.Queue(IdxValue(idx, finalNewLastValue.toResult))
       }
-      .getOrElse(this -> PQueue.empty)
+      .getOrElse(this -> m.Queue.empty)
   }
 
 }
