@@ -10,6 +10,7 @@ import ru.itclover.tsp.v2._
 import scala.collection.mutable.ListBuffer
 import scala.language.reflectiveCalls
 
+
 case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
   pattern: Pattern[E, State, Inner],
   patternMaxWindow: Long,
@@ -20,7 +21,7 @@ case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
   implicit timeExtractor: TimeExtractor[E]
 ) {
 
-  val log = Logger("PatternLogger")
+  val log = Logger("PatternProcessor")
   var lastState: MapPState[State, Inner, Out] = _
   var lastTime: Time = Time(0)
   log.info(s"pattern: $pattern, inner: $pattern.inner")
@@ -35,9 +36,9 @@ case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
       return
     }
 
-    val firstElement = elements.head
-    val mapFunction = mapResults(firstElement) // do not inline!
-    val mappedPattern: MapPattern[E, Inner, Out, State] = new MapPattern(pattern)(in => Result.succ(mapFunction(in)))
+    def firstElement = elements.head
+    def mapFunction = mapResults(firstElement) // do not inline!
+    def mappedPattern: MapPattern[E, Inner, Out, State] = new MapPattern(pattern)(in => Result.succ(mapFunction(in)))
 
     // if the last event occurred so long ago, clear the state
     if (lastState == null || timeExtractor(firstElement).toMillis - lastTime.toMillis > eventsMaxGapMs) {
@@ -45,21 +46,58 @@ case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
     }
 
     // Split the different time sequences if they occurred in the same time window
-    val sequences = PatternProcessor.splitByCondition(elements.toList)(
+    def sequences = PatternProcessor.splitByCondition(elements.toList)(
       (next, prev) => timeExtractor(next).toMillis - timeExtractor(prev).toMillis > eventsMaxGapMs
     )
 
     val machine = StateMachine[Id]
 
-    val consume: IdxValue[Out] => Unit = x => x.value.foreach(out.collect)
+    def consume: IdxValue[Out] => Unit = x => x.value.foreach(out.collect)
 
-    val seedStates = lastState +: Stream.continually(mappedPattern.initialState())
+    def seedStates = lastState +: Stream.continually(mappedPattern.initialState())
 
     // this step has side-effect = it calls `consume` for each output event. We need to process
-    // events sequentually, that's why I use foldLeft here
-    lastState = sequences.zip(seedStates).foldLeft(mappedPattern.initialState()) {
-      case (_, (events, seedState)) => machine.run(mappedPattern, events, seedState, consume)
+    // events sequentually, that's why I use foldLeft here 
+    def outStates  = sequences zip seedStates
+    
+    log.info ("Started lastState")
+    
+    //lastState = outStates.foldLeft (mappedPattern.initialState()) {
+    //  case (_, (events, seedState)) => machine.run(mappedPattern, events, seedState, consume)
+    //}
+    //lastState = for {
+    //  //(_, (events, seedState)) <- mappedPattern.initialState()
+    //  (events, seedState) <- mappedPattern.initialState()
+    //  state = machine.run(mappedPattern, events, seedState, consume)
+    //} yield(state)
+
+    //lastState = outStates flatMap { event, seedState} => 
+    //  machine.run(mappedPattern, events, seedState, consume)
+    //}
+
+    //lastState = for (i <- outStates ) match {
+    //  state <- machine.run(mappedPattern, _, _, consume)
+    //} yield (state)
+
+    //lastState = outStates flatMap { s => 
+
+    //  map { ev => 
+    //    machine.run(mappedPattern, ev, s, consume)
+    //  }
+
+    //}
+    //lastState = outStates flatMap { case (ev,state) => 
+    //  machine.run(mappedPattern, ev, state, consume)
+    //}
+
+    outStates foreach { case (ev,state) => 
+      //log.info (s"Event $ev state $state called")
+      log.info (s"PState $state called")
+      machine.run(mappedPattern, ev, state, consume)
     }
+    
+
+    log.info ("Finished lastState")
 
     lastTime = elements.lastOption.map(timeExtractor(_)).getOrElse(Time(0))
   }
