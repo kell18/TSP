@@ -36,9 +36,9 @@ case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
       return
     }
 
-    def firstElement = elements.head
-    def mapFunction = mapResults(firstElement) // do not inline!
-    def mappedPattern: MapPattern[E, Inner, Out, State] = new MapPattern(pattern)(in => Result.succ(mapFunction(in)))
+    val firstElement = elements.head
+    val mapFunction = mapResults(firstElement) // do not inline!
+    val mappedPattern: MapPattern[E, Inner, Out, State] = new MapPattern(pattern)(in => Result.succ(mapFunction(in)))
 
     // if the last event occurred so long ago, clear the state
     if (lastState == null || timeExtractor(firstElement).toMillis - lastTime.toMillis > eventsMaxGapMs) {
@@ -46,58 +46,26 @@ case class PatternProcessor[E, State <: PState[Inner, State], Inner, Out](
     }
 
     // Split the different time sequences if they occurred in the same time window
-    def sequences = PatternProcessor.splitByCondition(elements.toList)(
+    val sequences = PatternProcessor.splitByCondition(elements.toList)(
       (next, prev) => timeExtractor(next).toMillis - timeExtractor(prev).toMillis > eventsMaxGapMs
     )
 
     val machine = StateMachine[Id]
 
-    def consume: IdxValue[Out] => Unit = x => x.value.foreach(out.collect)
+    val consume: IdxValue[Out] => Unit = x => x.value.foreach(out.collect)
 
-    def seedStates = lastState +: Stream.continually(mappedPattern.initialState())
+    val seedStates = lastState +: Stream.continually(mappedPattern.initialState())
 
+    //log.info ("Started lastState")
     // this step has side-effect = it calls `consume` for each output event. We need to process
     // events sequentually, that's why I use foldLeft here 
-    def outStates  = sequences zip seedStates
+    val outStates  = sequences zip seedStates
     
-    log.info ("Started lastState")
-    
-    //lastState = outStates.foldLeft (mappedPattern.initialState()) {
-    //  case (_, (events, seedState)) => machine.run(mappedPattern, events, seedState, consume)
-    //}
-    //lastState = for {
-    //  //(_, (events, seedState)) <- mappedPattern.initialState()
-    //  (events, seedState) <- mappedPattern.initialState()
-    //  state = machine.run(mappedPattern, events, seedState, consume)
-    //} yield(state)
-
-    //lastState = outStates flatMap { event, seedState} => 
-    //  machine.run(mappedPattern, events, seedState, consume)
-    //}
-
-    //lastState = for (i <- outStates ) match {
-    //  state <- machine.run(mappedPattern, _, _, consume)
-    //} yield (state)
-
-    //lastState = outStates flatMap { s => 
-
-    //  map { ev => 
-    //    machine.run(mappedPattern, ev, s, consume)
-    //  }
-
-    //}
-    //lastState = outStates flatMap { case (ev,state) => 
-    //  machine.run(mappedPattern, ev, state, consume)
-    //}
-
-    outStates foreach { case (ev,state) => 
-      //log.info (s"Event $ev state $state called")
-      log.info (s"PState $state called")
-      machine.run(mappedPattern, ev, state, consume)
+    lastState = outStates.foldLeft (mappedPattern.initialState()) {
+      case (_, (events, seedState)) => machine.run(mappedPattern, events, seedState, consume)
     }
-    
 
-    log.info ("Finished lastState")
+    //log.info ("Finished lastState")
 
     lastTime = elements.lastOption.map(timeExtractor(_)).getOrElse(Time(0))
   }
