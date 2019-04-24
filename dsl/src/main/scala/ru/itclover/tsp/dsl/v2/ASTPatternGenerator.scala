@@ -60,6 +60,8 @@ case class ASTPatternGenerator[Event, EKey, EItem]()(
             new ExtractingPattern[Event, EKey, EItem, Long, AnyState[Long]](id.value, id.value)
           case DoubleASTType =>
             new ExtractingPattern[Event, EKey, EItem, Double, AnyState[Double]](id.value, id.value)
+          case FloatASTType =>
+            new ExtractingPattern[Event, EKey, EItem, Float, AnyState[Float]](id.value, id.value)
           case BooleanASTType =>
             new ExtractingPattern[Event, EKey, EItem, Boolean, AnyState[Boolean]](id.value, id.value)
           case AnyASTType => new ExtractingPattern[Event, EKey, EItem, Any, AnyState[Any]](id.value, id.value)
@@ -143,10 +145,12 @@ case class ASTPatternGenerator[Event, EKey, EItem]()(
                 .asInstanceOf[Pattern[Event, AnyState[Double], Double]],
               ac.window
             )
-          case Lag =>
+          case Lag => 
+            log.info (s"Lag called with args: value = $ac.value, window = $ac.window")
             richPatterns.lag(
               generatePattern(ac.value)
-                .asInstanceOf[Pattern[Event, AnyState[Double], Double]],
+                //.asInstanceOf[Pattern[Event, AnyState[Double], Double]],
+                .asInstanceOf[Pattern[Event, AnyState[Float], Float]],
               ac.window
             )
         }
@@ -181,6 +185,7 @@ case class ASTPatternGenerator[Event, EKey, EItem]()(
           case BooleanASTType => new MapPattern(generatePattern(c.inner))(decodeToBoolean(_))
           case StringASTType  => new MapPattern(generatePattern(c.inner))(decodeToString(_))
           case DoubleASTType  => new MapPattern(generatePattern(c.inner))(decodeToDouble(_))
+          case FloatASTType   => new MapPattern(generatePattern(c.inner))(decodeToFloat(_))
           case AnyASTType     => new MapPattern(generatePattern(c.inner))(decodeToAny(_))
         }
 

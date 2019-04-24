@@ -2,6 +2,7 @@ package ru.itclover.tsp.io
 
 trait BasicDecoders[From] {
   implicit def decodeToDouble: Decoder[From, Double]
+  implicit def decodeToFloat: Decoder[From, Float]
   implicit def decodeToInt: Decoder[From, Int]
   implicit def decodeToString: Decoder[From, String]
   implicit def decodeToAny: Decoder[From, Any]
@@ -20,6 +21,19 @@ object AnyDecodersInstances extends BasicDecoders[Any] with Serializable {
             throw new RuntimeException(s"Cannot parse String ($s) to Double, exception: ${e.toString}")
         }
       case null => Double.NaN
+    }
+  }
+  
+  implicit val decodeToFloat: Decoder[Any, Float] = new AnyDecoder[Float] {
+    override def apply(x: Any) = x match {
+      case d: Float            => d
+      case n: java.lang.Number => n.floatValue()
+      case s: String =>
+        try { Helper.strToFloat(s) } catch {
+          case e: Exception =>
+            throw new RuntimeException(s"Cannot parse String ($s) to Float, exception: ${e.toString}")
+        }
+      case null => Float.NaN
     }
   }
 
@@ -71,6 +85,9 @@ object DoubleDecoderInstances extends BasicDecoders[Double] {
   implicit override def decodeToDouble = Decoder { d: Double =>
     d
   }
+  implicit override def decodeToFloat = Decoder { d: Double =>
+    d.toFloat
+  }
   implicit override def decodeToInt = Decoder { d: Double =>
     d.toInt
   }
@@ -86,4 +103,5 @@ object DoubleDecoderInstances extends BasicDecoders[Double] {
 object Helper {
   def strToInt(s: String) = s.toInt
   def strToDouble(s: String) = s.toDouble
+  def strToFloat(s: String) = s.toFloat
 }

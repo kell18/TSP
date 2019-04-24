@@ -16,6 +16,7 @@ import shapeless.{::, HNil}
 
 import scala.language.higherKinds
 import scala.reflect.ClassTag
+import com.typesafe.scalalogging.Logger
 
 // TODO@trolley813: Adapt to the new `v2` single-state patterns
 //object ASTBuilder {
@@ -30,6 +31,8 @@ class ASTBuilder(val input: ParserInput, toleranceFraction: Double, fieldsTags: 
 
   // TODO: Move to params
   @transient implicit val funReg: FunctionRegistry = DefaultFunctionRegistry
+  
+  private val log = Logger("ASTBuilderLogger")
 
   def start: Rule1[AST] = rule {
     trileanExpr ~ EOI
@@ -380,9 +383,15 @@ class ASTBuilder(val input: ParserInput, toleranceFraction: Double, fieldsTags: 
               arguments
             )
           case "lag" =>
+
+            log.info (s"Lag called with args: $arguments.head")
             if (arguments.length > 1) throw ParseException("Lag should use only 1 argument when called without window")
             AggregateCall(Lag, arguments.head, Window(1), Some(Window(0)))
-          case _ => FunctionCall(Symbol(normalisedFunction), arguments)
+
+          case _ => 
+            
+            log.info ("FunctionCall called")
+            FunctionCall(Symbol(normalisedFunction), arguments)
         }
       })
       | anyWord ~ ws ~ "(" ~ ws ~ expr ~ ws ~ "," ~ ws ~ time ~ ws ~ ")" ~ ws ~>

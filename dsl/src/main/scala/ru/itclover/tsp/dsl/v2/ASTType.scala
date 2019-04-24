@@ -7,6 +7,7 @@ case object IntASTType extends ASTType
 case object LongASTType extends ASTType
 case object BooleanASTType extends ASTType
 case object DoubleASTType extends ASTType
+case object FloatASTType extends ASTType
 case object StringASTType extends ASTType
 case object AnyASTType extends ASTType
 
@@ -15,6 +16,7 @@ object ASTType {
   def of[T](implicit ct: ClassTag[T]): ASTType = ct.runtimeClass match {
     // Basic check, if T isn't lost
     case c if c.isAssignableFrom(classOf[Double])  => DoubleASTType
+    case c if c.isAssignableFrom(classOf[Float])   => FloatASTType
     case c if c.isAssignableFrom(classOf[Long])    => LongASTType
     case c if c.isAssignableFrom(classOf[Int])     => IntASTType
     case c if c.isAssignableFrom(classOf[Boolean]) => BooleanASTType
