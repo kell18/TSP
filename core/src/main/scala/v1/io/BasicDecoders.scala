@@ -8,8 +8,11 @@ trait BasicDecoders[From] {
   implicit def decodeToAny: Decoder[From, Any]
 }
 
+
+// TBD: Implement an error handling strategy with Cats Validated
 object AnyDecodersInstances extends BasicDecoders[Any] with Serializable {
   import Decoder._
+
 
   implicit val decodeToDouble: Decoder[Any, Double] = new AnyDecoder[Double] {
     override def apply(x: Any) = x match {
@@ -17,11 +20,11 @@ object AnyDecodersInstances extends BasicDecoders[Any] with Serializable {
       case n: java.lang.Number => n.doubleValue()
       case s: String =>
         try { Helper.strToDouble(s) } catch {
-          case e: Exception =>
-            throw new RuntimeException(s"Cannot parse String ($s) to Double, exception: ${e.toString}")
+          case e: Exception => 0.0
+            //throw new RuntimeException(s"Cannot parse String ($s) to Double, exception: ${e.toString}")
         }
-      case null =>    // TSP-219 fix
-      case _    =>    // FIXME
+      case null => 0.0   // TSP-219 fix
+      case _    => 0.0   // FIXME
     }
   }
   
